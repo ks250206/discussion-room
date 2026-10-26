@@ -243,17 +243,18 @@ Hypothesis Graph は、材料科学の研究活動を**一枚の広大なホワ�
 - `ionic` と `crystal` 半径を明確に区別して表示。
 - 同じ基準で選択した複数イオンを表・棒グラフで比較。
 - 半径不一致率 `|r_dopant-r_host|/r_host × 100%` を計算。
-- 参照元、単位（Å）、データセット版、データが存在しない場合の注意を表示。
+- 参照元、原単位と明示的な表示換算（Å）、データセット版、データが存在しない場合の注意を表示（[ADR-012](./decisions/012-scientific-data-sources.md)）。
 
 **科学的制約**
 
 - CNや酸化数が不明なら単一の半径を断定しない。
 - スピン状態依存のデータがある場合、選択条件を必須にする。
 - 値が存在しない条件では `null / unavailable` を返す。**近似値を断りなく補間しない**。
+- 半径比較は同じ定義、同じ単位または記録した明示的換算を用いる。同じ出典・版かを確認し、異なる／不明な出典・版を含むときは、そのことを明示して利用者が選択した比較にする（[ADR-012](./decisions/012-scientific-data-sources.md)）。
 - 半径差から置換可否や導電率を直接断定しない。共有結合性、局所配位、結晶格子、電荷補償等を別途考慮する。
 - Shannon半径の一般的な適用範囲と、硫化物・ハロゲン化物等への適用上の注意を表示する。
 
-**データ管理:** 同梱の版固定JSON（配布条件を事前確認）または出典・ライセンスを明確化したデータセットを使用。生の紙面表を無断で自動スクレイピングして埋め込まない。
+**データ管理:** 初期版では第三者物性表を同梱せず、利用者の手元のファイルを読み込む（[ADR-012](./decisions/012-scientific-data-sources.md)。実装は未了）。出典・利用条件の不明点を保持し、第三者表は、Room = Project の同期と完全な ZIP 往復を前提に利用範囲を確認してから取り込む。範囲外の共有・出力は欠落で隠さず拒否し、公開サンプルへの第三者表の収録には同 ADR の同梱ゲートを要する。生の紙面表を無断で自動スクレイピングして埋め込まない。
 
 ### 4.3 Composition Calculator
 
@@ -836,7 +837,7 @@ Performance目標は保証値ではない。実装後に実機測定し、条件
 - [ ] Pyodideをmodule Workerで起動し、NumPyを使った計算を行う。
 - [ ] Worker停止・再起動後もUIが復旧する。
 - [ ] アプリの容量、パッケージ配布方法、オフライン動作を調べる。
-- [ ] Shannon半径用データの出典・構造・再配布条件を確定する。
+- [ ] Shannon半径用データの出典・構造・再配布条件を確定する（方針は [ADR-012](./decisions/012-scientific-data-sources.md) で決定。数値表は同梱せず、持ち込み・共有ゲートの実装は未了）。
 
 **完了条件:** 最小キャンバスにPythonカードと周期表カードを置き、保存・再読込・Python実行が可能。
 
@@ -902,7 +903,7 @@ Performance目標は保証値ではない。実装後に実機測定し、条件
 ### 12.2 Integration Test
 
 - [ ] カード編集→DB保存→ページ再読込→内容復元。
-- [ ] ZIP export→空DBへimport→全カードとRelationsを復元。
+- [ ] ZIP export→空DBへimport→全カードとRelations、受け入れた Project データを完全に復元。第三者表は [ADR-012](./decisions/012-scientific-data-sources.md) の範囲ゲートを取込前に通し、範囲外の共有・export / import は明示的に拒否する。値を黙って欠落させた往復を成功としない。
 - [ ] 周期表選択→イオン半径カード→Python→グラフのDataflow。
 - [ ] Worker異常終了→表示可能なエラー→再起動後再実行。
 - [ ] 仮説と元データを別々のボードで表示しても破損しない。
@@ -911,6 +912,8 @@ Performance目標は保証値ではない。実装後に実機測定し、条件
 ### 12.3 E2Eの代表ケース
 
 **Case: LGPS ionic-radius study**
+
+試験・サンプルは合成と明記した自作データで行う。第三者の実表を fixture に追加する場合は [ADR-012](./decisions/012-scientific-data-sources.md) の同梱ゲートを先に満たす。Project への取込を認めたデータは、以下の手順で欠落なく同期・復元する。
 
 1. 新規ボード作成。
 2. Question/Hypothesisを配置。
@@ -1026,7 +1029,7 @@ Performance目標は保証値ではない。実装後に実機測定し、条件
 | Canvas基盤 | React Flowを初期採用 | 無限ホワイトボード的な手描きのUXと同期方法 |
 | tldraw | 代替案 | 研究室・大学利用のライセンス適用条件 |
 | Python | Pyodide Worker | 必要パッケージとブラウザ互換性、ロード時間 |
-| Shannon dataset | 出典固定・条件を完全保持 | 再配布条件、採用形式、欠損値の扱い |
+| Shannon dataset | 数値表は同梱しない。スキーマと利用者持ち込み（[ADR-012](./decisions/012-scientific-data-sources.md)） | データセット自体の再配布許諾が確認できたとき |
 | Crystal parser | M3で専門ライブラリを選定 | CIF対称展開、混合占有、空間群のテスト |
 | AI provider | 後期アダプター | ローカル/クラウド利用、機密情報の送信制御 |
 | Data blobs | OPFS優先 | Safari等の対応、ファイル容量、ZIP輸出 |
@@ -1047,7 +1050,7 @@ Performance目標は保証値ではない。実装後に実機測定し、条件
 6. Dexie: https://dexie.org/docs/Tutorial/Getting-started
 7. pymatgen `Species.get_shannon_radius`: https://pymatgen.org/pymatgen.core.html — 半径定義、酸化数、CN、スピン情報の参考。
 8. R. D. Shannon, *Revised Effective Ionic Radii and Systematic Studies of Interatomic Distances in Halides and Chalcogenides*, Acta Crystallographica A **32**, 751–767 (1976). DOI: https://doi.org/10.1107/S0567739476001551
-9. Open-source ionic-radiiデータの構造例（出典と再利用条件を別途確認）: https://github.com/prtkm/ionic-radii
+9. 公開 ionic-radii データの構造例（確認結果は [ADR-012](./decisions/012-scientific-data-sources.md)）: https://github.com/prtkm/ionic-radii
 
 ---
 
@@ -1063,7 +1066,7 @@ Performance目標は保証値ではない。実装後に実機測定し、条件
 | ADR-006 | AI変更は必ず差分承認 | 信頼性・科学的責任・監査可能性 | 原則維持 |
 | ADR-007 | 出典のない定量主張は確定表示しない | AIハルシネーション対策 | 原則維持 |
 
-ADR-001 は [ADR-008](./decisions/008-local-server.md) が置き換える（設計判断。実装は未了）。同期は [ADR-009](./decisions/009-command-event-sync.md)、Room と識別は [ADR-010](./decisions/010-project-room-identity.md)。差分の一覧は [implementation-plan.md](./implementation-plan.md) の「0. 前提の改訂」。
+ADR-001 は [ADR-008](./decisions/008-local-server.md) が置き換える（設計判断。実装は未了）。同期は [ADR-009](./decisions/009-command-event-sync.md)、Room と識別は [ADR-010](./decisions/010-project-room-identity.md)。科学データの同梱方針は [ADR-012](./decisions/012-scientific-data-sources.md)。差分の一覧は [implementation-plan.md](./implementation-plan.md) の「0. 前提の改訂」。
 
 ---
 
