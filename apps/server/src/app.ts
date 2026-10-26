@@ -10,7 +10,12 @@ const sendJson = (res: Parameters<RequestListener>[1], statusCode: number, body:
 };
 
 export const handleRequest: RequestListener = (req, res) => {
-  const url = new URL(req.url ?? "/", "http://localhost");
+  const url = URL.parse(req.url ?? "/", "http://localhost");
+
+  if (!url) {
+    sendJson(res, 400, { error: "bad_request" });
+    return;
+  }
 
   if (req.method === "GET" && url.pathname === "/api/health") {
     const body: HealthResponse = { status: "ok" };

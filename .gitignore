@@ -13,6 +13,7 @@ dist-ssr
 
 # Server data directory (SQLite, blobs)
 .data/
+dataDir/
 
 # dotenv environment variable files
 .env
