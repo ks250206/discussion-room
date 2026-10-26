@@ -74,6 +74,17 @@ export const SUPPORTED_UNITS = Object.freeze(
       { symbols: ["Pa"], dimension: "pressure", exponent: 0, offset: 0 },
       { symbols: ["kPa"], dimension: "pressure", exponent: 3, offset: 0 },
       { symbols: ["MPa"], dimension: "pressure", exponent: 6, offset: 0 },
+      { symbols: ["Ω·m²", "ohm*m^2"], dimension: "areaResistance", exponent: 0, offset: 0 },
+      { symbols: ["Ω·cm²", "ohm*cm^2"], dimension: "areaResistance", exponent: -4, offset: 0 },
+      { symbols: ["A/m²", "A/m^2"], dimension: "currentDensity", exponent: 0, offset: 0 },
+      { symbols: ["A/cm²", "A/cm^2"], dimension: "currentDensity", exponent: 4, offset: 0 },
+      { symbols: ["mA/cm²", "mA/cm^2"], dimension: "currentDensity", exponent: 1, offset: 0 },
+      {
+        symbols: ["µA/cm²", "μA/cm²", "uA/cm^2"],
+        dimension: "currentDensity",
+        exponent: -2,
+        offset: 0,
+      },
     ] as const
   ).map((unit) => {
     Object.freeze(unit.symbols);
@@ -127,6 +138,40 @@ function scaleByPowerOfTen(value: number, exponent: number): number {
   return exponent >= 0 ? value * 10 ** exponent : value / 10 ** -exponent;
 }
 
+export type UnitConversionRelation = {
+  readonly fromUnit: string;
+  readonly toUnit: string;
+  readonly scaleExponent: number;
+  readonly offset: number;
+};
+
+/**
+ * Affine map y = x × 10^scaleExponent + offset for one explicit same-dimension pair.
+ * Factors are read only from SUPPORTED_UNITS. Absolute zero, significant figures,
+ * absolute-temperature intent, and finite magnitude stay in convertQuantity.
+ */
+export function unitConversionRelation(
+  fromUnit: string,
+  toUnit: string,
+): Result<
+  UnitConversionRelation,
+  Extract<UnitConversionError, { readonly code: "unsupported_unit" | "incompatible_units" }>
+> {
+  const source = findUnit(fromUnit);
+  if (source === undefined) return err({ code: "unsupported_unit", unit: fromUnit });
+  const target = findUnit(toUnit);
+  if (target === undefined) return err({ code: "unsupported_unit", unit: toUnit });
+  if (source.dimension !== target.dimension) {
+    return err({ code: "incompatible_units", fromUnit, toUnit });
+  }
+  return ok({
+    fromUnit,
+    toUnit,
+    scaleExponent: source.exponent - target.exponent,
+    offset: scaleByPowerOfTen(source.offset - target.offset, -target.exponent),
+  });
+}
+
 const UnitConversionOptionsSchema = v.strictObject({
   temperatureKind: v.exactOptional(v.literal("absolute")),
 });
@@ -144,6 +189,7 @@ const ConversionInputSchema = v.strictObject({
  * absolute readings and offset conversions require explicit absolute intent.
  * Uncertainty is an absolute magnitude (CI95: half-width). Significant figures
  * cannot transfer across an offset: reject instead of changing or dropping them.
+ * Scale and offset come from unitConversionRelation.
  */
 export function convertQuantity(
   quantity: ScientificQuantity,
@@ -152,29 +198,17 @@ export function convertQuantity(
 ): Result<ScientificQuantity, UnitConversionError | ValidationError> {
   const input = validate(ConversionInputSchema, { quantity, toUnit, options });
   if (!input.ok) return input;
-  const source = findUnit(input.value.quantity.unit);
-  if (source === undefined) {
-    return err({ code: "unsupported_unit", unit: input.value.quantity.unit });
-  }
-  const target = findUnit(input.value.toUnit);
-  if (target === undefined) return err({ code: "unsupported_unit", unit: input.value.toUnit });
-  if (source.dimension !== target.dimension) {
-    return err({
-      code: "incompatible_units",
-      fromUnit: input.value.quantity.unit,
-      toUnit: input.value.toUnit,
-    });
-  }
+  const relation = unitConversionRelation(input.value.quantity.unit, input.value.toUnit);
+  if (!relation.ok) return relation;
   const original = input.value.quantity;
-  const exponent = source.exponent - target.exponent;
-  const offset = scaleByPowerOfTen(source.offset - target.offset, -target.exponent);
+  const { scaleExponent, offset } = relation.value;
   if (offset !== 0 && original.significantFigures !== undefined) {
     return err({ code: "precision_not_transferable" });
   }
   if (offset !== 0 && input.value.options.temperatureKind !== "absolute") {
     return err({ code: "absolute_temperature_required" });
   }
-  const scaledValue = scaleByPowerOfTen(original.value, exponent);
+  const scaledValue = scaleByPowerOfTen(original.value, scaleExponent);
   // Avoid an intermediate base-unit value that could overflow unnecessarily.
   const value = finiteResult(
     offset === 0 ? scaledValue : scaledValue + offset,
@@ -184,7 +218,10 @@ export function convertQuantity(
   const uncertainty =
     original.uncertainty === undefined
       ? undefined
-      : finiteResult(scaleByPowerOfTen(original.uncertainty, exponent), original.uncertainty !== 0);
+      : finiteResult(
+          scaleByPowerOfTen(original.uncertainty, scaleExponent),
+          original.uncertainty !== 0,
+        );
   if (uncertainty !== undefined && !uncertainty.ok) return uncertainty;
   return validate(ScientificQuantitySchema, {
     ...original,

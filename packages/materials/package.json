@@ -9,6 +9,9 @@
   "scripts": {
     "test": "vp test"
   },
+  "dependencies": {
+    "@discussion-room/domain": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "catalog:",
     "vite-plus": "catalog:"

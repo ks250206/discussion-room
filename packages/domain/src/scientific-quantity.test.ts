@@ -7,11 +7,32 @@ import {
   ok,
   ScientificQuantitySchema,
   SUPPORTED_UNITS,
+  unitConversionRelation,
   validate,
   type ScientificQuantity,
 } from "./index.ts";
 
 const provenanceId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+function unitsIn(dimension: string) {
+  return SUPPORTED_UNITS.filter((unit) => unit.dimension === dimension).map((unit) => ({
+    symbols: [...unit.symbols],
+    exponent: unit.exponent,
+    offset: unit.offset,
+  }));
+}
+
+function codePoints(symbol: string): number[] {
+  const points: number[] = [];
+  let index = 0;
+  while (index < symbol.length) {
+    const point = symbol.codePointAt(index);
+    if (point === undefined) break;
+    points.push(point);
+    index += point > 0xffff ? 2 : 1;
+  }
+  return points;
+}
 
 function quantity(input: unknown): ScientificQuantity {
   const result = validate(ScientificQuantitySchema, input);
@@ -134,6 +155,16 @@ describe("explicit unit conversion", () => {
     [1, "S/cm", "mS/cm", 1000],
     [1, "MPa", "Pa", 1e6],
     [1000, "Pa", "kPa", 1],
+    [1, "Ω·m²", "Ω·cm²", 10000],
+    [1, "ohm*m^2", "ohm*cm^2", 10000],
+    [10000, "Ω·cm²", "ohm*m^2", 1],
+    [1, "A/cm²", "A/m²", 10000],
+    [1, "mA/cm²", "A/m²", 10],
+    [1, "mA/cm^2", "A/m^2", 10],
+    [1, "µA/cm²", "A/m²", 0.01],
+    [1, "μA/cm²", "uA/cm^2", 1],
+    [-1, "mA/cm²", "A/m²", -10],
+    [-2, "Ω·m²", "Ω·cm²", -20000],
   ])("converts %s %s explicitly to %s", (value, unit, toUnit, expected) => {
     const original = Object.freeze({ value, unit });
     const result = convertQuantity(original, toUnit, { temperatureKind: "absolute" });
@@ -337,6 +368,11 @@ describe("explicit unit conversion", () => {
     ["°C", "%"],
     ["m", "S/m"],
     ["MPa", "K"],
+    ["Ω·m²", "A/m²"],
+    ["S/m", "Ω·m²"],
+    ["S/cm", "Ω·cm²"],
+    ["mS/cm", "ohm*cm^2"],
+    ["A/cm²", "m"],
   ])("rejects incompatible units %s → %s", (unit, toUnit) => {
     expect(convertQuantity({ value: 1, unit }, toUnit)).toEqual(
       err({ code: "incompatible_units", fromUnit: unit, toUnit }),
@@ -350,6 +386,11 @@ describe("explicit unit conversion", () => {
     ["wt%", "fraction", "wt%"],
     ["ppm", "%", "ppm"],
     ["custom-unit", "custom-unit", "custom-unit"],
+    ["Ω", "Ω·m²", "Ω"],
+    ["ohm", "ohm*m^2", "ohm"],
+    ["Ω·m²", "ohm", "ohm"],
+    ["A/m2", "A/m²", "A/m2"],
+    ["mA/cm2", "A/m^2", "mA/cm2"],
   ])("rejects unsupported units %s → %s", (unit, toUnit, unsupported) => {
     expect(convertQuantity({ value: 1, unit }, toUnit)).toEqual(
       err({ code: "unsupported_unit", unit: unsupported }),
@@ -368,6 +409,95 @@ describe("explicit unit conversion", () => {
     { value: 1, unit: "angstrom", uncertainty: Number.MIN_VALUE },
   ])("rejects total underflow instead of replacing a nonzero value with zero %j", (original) => {
     expect(convertQuantity(original, "m")).toEqual(err({ code: "numeric_underflow" }));
+  });
+
+  test("accepts negative area resistance and current density as algebraic readings", () => {
+    expect(quantity({ value: -1, unit: "Ω·m²" })).toEqual({ value: -1, unit: "Ω·m²" });
+    expect(quantity({ value: -4, unit: "A/cm²" })).toEqual({ value: -4, unit: "A/cm²" });
+    const signed = convertQuantity({ value: -0, unit: "mA/cm²" }, "A/m²");
+    assert(signed.ok);
+    expect(Object.is(signed.value.value, -0)).toBe(true);
+    expect(signed.value.unit).toBe("A/m²");
+  });
+
+  test("scales area-resistance metadata by the power of ten and does not mutate the input", () => {
+    const original = Object.freeze(
+      quantity({
+        value: 1,
+        unit: "Ω·m²",
+        uncertainty: 0.2,
+        uncertaintyType: "sd",
+        significantFigures: 4,
+        method: "cell ASR",
+        provenanceId,
+      }),
+    );
+    expect(convertQuantity(original, "ohm*cm^2")).toEqual(
+      ok({
+        ...original,
+        value: 10000,
+        unit: "ohm*cm^2",
+        uncertainty: 2000,
+      }),
+    );
+    expect(original.value).toBe(1);
+    expect(original.unit).toBe("Ω·m²");
+    expect(original.uncertainty).toBe(0.2);
+  });
+
+  test("reads area, current, temperature, and ratio factors from the same unit table", () => {
+    expect(unitConversionRelation("Ω·m²", "Ω·cm²")).toEqual(
+      ok({ fromUnit: "Ω·m²", toUnit: "Ω·cm²", scaleExponent: 4, offset: 0 }),
+    );
+    expect(unitConversionRelation("mA/cm²", "A/m²")).toEqual(
+      ok({ fromUnit: "mA/cm²", toUnit: "A/m²", scaleExponent: 1, offset: 0 }),
+    );
+    expect(unitConversionRelation("%", "fraction")).toEqual(
+      ok({ fromUnit: "%", toUnit: "fraction", scaleExponent: -2, offset: 0 }),
+    );
+    expect(unitConversionRelation("°C", "K")).toEqual(
+      ok({ fromUnit: "°C", toUnit: "K", scaleExponent: 0, offset: 273.15 }),
+    );
+    expect(unitConversionRelation("K", "°C")).toEqual(
+      ok({ fromUnit: "K", toUnit: "°C", scaleExponent: 0, offset: -273.15 }),
+    );
+    expect(unitConversionRelation("S/m", "Ω·m²")).toEqual(
+      err({ code: "incompatible_units", fromUnit: "S/m", toUnit: "Ω·m²" }),
+    );
+    expect(unitConversionRelation("ohm", "ohm*m^2")).toEqual(
+      err({ code: "unsupported_unit", unit: "ohm" }),
+    );
+    expect(
+      convertQuantity({ value: 25, unit: "°C", significantFigures: 2 }, "K", {
+        temperatureKind: "absolute",
+      }),
+    ).toEqual(err({ code: "precision_not_transferable" }));
+  });
+
+  test("lists only the explicit area-resistance and current-density spellings", () => {
+    expect(unitsIn("conductivity")).toEqual([
+      { symbols: ["S/m"], exponent: 0, offset: 0 },
+      { symbols: ["S/cm"], exponent: 2, offset: 0 },
+      { symbols: ["mS/cm"], exponent: -1, offset: 0 },
+    ]);
+    expect(unitsIn("areaResistance")).toEqual([
+      { symbols: ["Ω·m²", "ohm*m^2"], exponent: 0, offset: 0 },
+      { symbols: ["Ω·cm²", "ohm*cm^2"], exponent: -4, offset: 0 },
+    ]);
+    expect(unitsIn("currentDensity")).toEqual([
+      { symbols: ["A/m²", "A/m^2"], exponent: 0, offset: 0 },
+      { symbols: ["A/cm²", "A/cm^2"], exponent: 4, offset: 0 },
+      { symbols: ["mA/cm²", "mA/cm^2"], exponent: 1, offset: 0 },
+      { symbols: ["µA/cm²", "μA/cm²", "uA/cm^2"], exponent: -2, offset: 0 },
+    ]);
+    expect(codePoints("Ω·m²")).toEqual([0x3a9, 0xb7, 0x6d, 0xb2]);
+    expect(codePoints("µA/cm²")).toEqual([0xb5, 0x41, 0x2f, 0x63, 0x6d, 0xb2]);
+    expect(codePoints("μA/cm²")).toEqual([0x3bc, 0x41, 0x2f, 0x63, 0x6d, 0xb2]);
+    const symbols = SUPPORTED_UNITS.flatMap((unit) => [...unit.symbols]);
+    expect(symbols).not.toContain("Ω");
+    expect(symbols).not.toContain("ohm");
+    expect(symbols).not.toContain("A/m2");
+    expect(SUPPORTED_UNITS).toHaveLength(22);
   });
 
   test("revalidates nonfinite inputs and invalid target spelling", () => {

@@ -43,11 +43,13 @@ export {
   SUPPORTED_UNITS,
   UncertaintyTypeSchema,
   UnitSchema,
+  unitConversionRelation,
   type NumericError,
   type ScientificQuantity,
   type UncertaintyType,
   type UnitConversionError,
   type UnitConversionOptions,
+  type UnitConversionRelation,
 } from "./scientific-quantity.ts";
 export {
   OriginTypeSchema,
