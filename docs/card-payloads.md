@@ -81,3 +81,5 @@ opaque 互換 API の成功を M1 の保存ゲートとして使ってはいけ�
 すべての M1 オブジェクト・ネストしたオブジェクト・配列は readonly 型。これはコンパイル時の保護であり、入力の freeze はしない。検証後の共有データを変更せず、更新には新しい値を作る。未知キーは strictObject で拒否し、AI 出自等のメタデータを黙って取り除かない。
 
 参照: [Valibot strictObject](https://valibot.dev/api/strictObject/)、[readonly](https://valibot.dev/api/readonly/)。
+
+#33 の適用境界は [ドメイン Command / Event](./domain-commands.md) に実装契約を記録する。登録・承認の宣言だけで適用許可を得ず、ctx と全履歴を含む検査を通す。

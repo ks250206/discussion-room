@@ -32,3 +32,5 @@ GraphReferenceError は `code: graph_integrity_failed, issues`。各 issue は `
 出自を将来拡張する場合は、全線と PortDefinition の明示的な省略可能 `metadata`、VisualConnector の必須 `style` に plain object を保持できる。これらの内容は未知キー・ネストも参照を含めてそのまま保持し、外側の未知フィールドは黙って捨てない。省略可能な metadata はキー不在のみ許し、undefined/null は拒否する。readonly は TypeScript の型境界であり、入力の freeze や深いコピーは行わない。
 
 この検証はグラフ構造だけを保証する。metadata/style の JSON 安全性、科学的主張の正しさ、AI 提案の承認・保存許可は保証しない。これらは送受信・保存・承認の境界で検証する。
+
+Command 適用時のポート変更と CanvasItem 削除の関連線処理は [ドメイン Command / Event](./domain-commands.md) を参照。

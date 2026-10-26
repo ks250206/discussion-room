@@ -135,3 +135,15 @@ export {
   type M1Artifact,
   type M1ArtifactRevision,
 } from "./card-content.ts";
+export {
+  CommandSchema,
+  DecisionContextSchema,
+  DomainStateSchema,
+  EventSchema,
+  type Command,
+  type DecisionContext,
+  type DomainState,
+  type Event,
+} from "./commands.ts";
+export { checkBaseVersion, decide, evolve } from "./command-application.ts";
+export { validateDomainState, type CommandError, type DomainError } from "./domain-state.ts";

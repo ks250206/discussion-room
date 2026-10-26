@@ -29,3 +29,5 @@ title/name/kind/author は空白だけの文字列も拒否する。判定のた
 参照: [concept.md §7.1–7.2](./concept.md)、[implementation-plan.md §1.1 / §1.3](./implementation-plan.md)、[Valibot strictObject](https://valibot.dev/api/strictObject/)。
 
 3 種類の線とポートの構造・参照検証は [グラフ検証](./domain-graphs.md) を参照。
+
+Command による生成・内容変更・削除と、著者付き Revision の保存ゲートは [ドメイン Command / Event](./domain-commands.md) を参照。
