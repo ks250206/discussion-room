@@ -10,7 +10,11 @@
     "test": "vp test",
     "spike:dev": "node --watch src/spikes/server-stack/main.ts",
     "spike:build": "vp pack src/spikes/server-stack/main.ts --platform node --out-dir dist-spike",
-    "spike:start": "node dist-spike/main.mjs"
+    "spike:start": "node dist-spike/main.mjs",
+    "spike:room:dev": "node --watch src/spikes/room-roundtrip/main.ts",
+    "spike:room:build": "vp pack src/spikes/room-roundtrip/main.ts --platform node --out-dir dist-room-spike",
+    "spike:room:start": "node dist-room-spike/main.mjs",
+    "spike:room:measure": "node src/spikes/room-roundtrip/measure.ts"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
