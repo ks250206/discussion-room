@@ -26,7 +26,7 @@
 ## issue と PR の書き方
 
 - issue はテンプレート（feature / bug / spike）から作る。sub-issue には `親エピック: #<番号>` を書き、受け入れ条件に `vp check` / `vp test` が通ることを含める。
-- PR のタイトルは issue と同じ `[E<エピック>.<番号>] <タイトル>` にする。squash merge では PR タイトルがそのままコミットメッセージになる。
+- PR のタイトルは issue と同じ `[E<エピック>.<番号>] <タイトル>` にする。squash merge のコミットタイトルは PR タイトルになるよう設定している（コミット数にかかわらず）。
 - PR 本文の `Closes #<番号>` で、マージ時に issue が自動で閉じる。複数ある場合は `Closes #1, closes #2` のようにそれぞれ書く。
 - スパイクの結論は `docs/decisions/` に ADR として残し、PR から参照する。
 
@@ -66,7 +66,8 @@ gh api -X PUT repos/ks250206/discussion-room/branches/main/protection --input - 
 EOF
 
 gh repo edit ks250206/discussion-room \
-  --enable-squash-merge --enable-merge-commit=false --enable-rebase-merge=false \
+  --enable-squash-merge --squash-merge-commit-message pr-title \
+  --enable-merge-commit=false --enable-rebase-merge=false \
   --delete-branch-on-merge
 ```
 
