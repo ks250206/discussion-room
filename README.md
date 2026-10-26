@@ -23,7 +23,7 @@
 ```sh
 pnpm install
 
-vp check                          # fmt + lint + typecheck
+vp check                          # fmt + lint + typecheck（規約: docs/coding-conventions.md）
 vp test                           # 全パッケージのテスト
 vp build                          # apps/web のビルド（defaultPackage）
 vp run -r build                   # 全パッケージの build スクリプト
