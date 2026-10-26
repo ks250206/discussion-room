@@ -10,11 +10,11 @@
 - ArtifactRevision: `id, artifactId, parentId?, payload, author, createdAt, version`。親なしを根として表し、`author` は空でない識別表記文字列。認証や人物モデルをここでは定義しない。
 - CanvasItem: `id, boardId, artifactId?, x, y, width, height, viewState, version`。artifactId がない装飾カードを許可する。
 
-title/name/kind/author は空白だけの文字列も拒否する。判定のために trim するが、保存する文字列の前後の空白は取り除かない。kind の種類と payload の判別共用体は #30 で扱うため、ここでは種類を固定しない。座標は有限数、寸法と zoom は正の有限数。省略可能な参照はキーの不在だけを許し、明示的な undefined/null は拒否する。外側の未定義フィールドはエラーとし、未知の出自メタデータを黙って取り除かない。
+title/name/kind/author は空白だけの文字列も拒否する。判定のために trim するが、保存する文字列の前後の空白は取り除かない。kind の種類と payload の判別共用体は [M1 カード payload](./card-payloads.md) の別の内容検証境界で扱うため、この構造スキーマでは種類を固定しない。座標は有限数、寸法と zoom は正の有限数。省略可能な参照はキーの不在だけを許し、明示的な undefined/null は拒否する。外側の未定義フィールドはエラーとし、未知の出自メタデータを黙って取り除かない。
 
-`payload` と `viewState` は必須の plain object（null prototype も許可）として受け、内容・未知キー・ネストをそのまま保持する。欠損、undefined、null、配列やスカラー、Date などのインスタンスは外側の object として拒否する。ここで検証するのは構造だけで、科学的妥当性・AI 提案の承認・JSON シリアライズ可能性を保証しない。種類別 payload 検証（#30）、科学的値の検証（#31）、保存・承認の境界は後続の責務であり、この段階の検証成功を保存許可として使わない。JSON 安全性と暗黙変換の拒否は、送受信境界の #34 の受け入れ条件で追跡する。単位換算、欠損値補完、日時の正規化はしない。
+`payload` と `viewState` は必須の plain object（null prototype も許可）として受け、内容・未知キー・ネストをそのまま保持する。欠損、undefined、null、配列やスカラー、Date などのインスタンスは外側の object として拒否する。ここで検証するのは構造だけで、科学的妥当性・AI 提案の承認・JSON シリアライズ可能性を保証しない。種類別 payload と科学的値の検証は [内容検証境界](./card-payloads.md#エンティティとの境界) で行い、保存・承認は後続の責務とする。この構造検証の成功を保存許可として使わない。JSON 安全性と暗黙変換の拒否は、送受信境界の #34 の受け入れ条件で追跡する。単位換算、欠損値補完、日時の正規化はしない。
 
-現在内容の正は `Artifact.revisionId` が指す `ArtifactRevision` の著者・日時を持つ記録とし、`Artifact.payload` はその内容の現在の materialization/cache とする。#33 の Command 適用層は、#30 の種類別 payload 検証と組み合わせ、内容と参照を一体で更新して両 payload の整合を維持する責務を持つ。ここでは opaque 内容に任意の深い等値判定を定義しないため、構造・参照検証の成功は payload 内容の一致、出自、承認を証明しない。
+現在内容の正は `Artifact.revisionId` が指す `ArtifactRevision` の著者・日時を持つ記録とし、`Artifact.payload` はその内容の現在の materialization/cache とする。#33 の Command 適用層は、種類別 payload 検証と組み合わせ、内容と参照を一体で更新して両 payload の整合を維持する責務を持つ。ここでは opaque 内容に任意の深い等値判定を定義しないため、構造・参照検証の成功は payload 内容の一致、出自、承認を証明しない。
 
 出力のエンティティ・viewport・snapshot・配列・opaque object のキーは readonly 型とする。これはコンパイル時の浅い保護で、入力の freeze や変更、opaque 内容の複製は行わない。payload/viewState の元オブジェクトとネストの所有者も、検証後は共有された内容を変更せず、更新時は新しい値を作る規約に従う。unknown なネストの深い不変性は型でも保証しない。
 
