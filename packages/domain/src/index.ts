@@ -35,3 +35,23 @@ export {
 } from "./schema-version.ts";
 export { TimestampSchema, type Timestamp } from "./timestamp.ts";
 export { validate, type ValidationError } from "./validation.ts";
+export {
+  convertQuantity,
+  divideFinite,
+  FiniteNumberSchema,
+  ScientificQuantitySchema,
+  SUPPORTED_UNITS,
+  UncertaintyTypeSchema,
+  UnitSchema,
+  type NumericError,
+  type ScientificQuantity,
+  type UncertaintyType,
+  type UnitConversionError,
+  type UnitConversionOptions,
+} from "./scientific-quantity.ts";
+export {
+  OriginTypeSchema,
+  ProvenanceSchema,
+  type OriginType,
+  type Provenance,
+} from "./provenance.ts";
