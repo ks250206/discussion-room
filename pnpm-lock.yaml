@@ -229,6 +229,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@discussion-room/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@hono/node-server':
         specifier: 'catalog:'
         version: 2.1.5(hono@4.13.14)
