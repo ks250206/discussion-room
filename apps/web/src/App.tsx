@@ -1,10 +1,9 @@
-import { packageName } from "@discussion-room/domain";
+import type { ShellStatus } from "./shell/shell-status.ts";
+import { AppShell } from "./shell/app-shell.tsx";
 
-export const App = () => (
-  <main>
-    <h1>Discussion Room</h1>
-    <p>
-      domain package: <code>{packageName}</code>
-    </p>
-  </main>
-);
+type AppProps = {
+  readonly status?: ShellStatus;
+};
+
+export const App = ({ status }: AppProps) =>
+  status === undefined ? <AppShell /> : <AppShell status={status} />;

@@ -5,7 +5,10 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["vite/client"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src"]
 }
