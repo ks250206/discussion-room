@@ -1,0 +1,28 @@
+{
+  "name": "discussion-room",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp run --filter ./apps/web dev",
+    "build": "vp run -r build",
+    "ready": "vp check && vp test && vp run -r build"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.15.0",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=24.22.1 <25",
+    "pnpm": "12.15.0"
+  },
+  "packageManager": "pnpm@12.15.0"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@discussion-room/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/main.ts",
+    "build": "vp pack src/main.ts --platform node",
+    "start": "node dist/main.mjs",
+    "test": "vp test"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
