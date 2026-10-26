@@ -7,9 +7,15 @@
     "dev": "node --watch src/main.ts",
     "build": "vp pack src/main.ts --platform node",
     "start": "node dist/main.mjs",
-    "test": "vp test"
+    "test": "vp test",
+    "spike:dev": "node --watch src/spikes/server-stack/main.ts",
+    "spike:build": "vp pack src/spikes/server-stack/main.ts --platform node --out-dir dist-spike",
+    "spike:start": "node dist-spike/main.mjs"
   },
   "dependencies": {
+    "@hono/node-server": "catalog:",
+    "hono": "catalog:",
+    "valibot": "catalog:",
     "ws": "catalog:"
   },
   "devDependencies": {
