@@ -1,0 +1,49 @@
+name: Spike
+description: 技術検証。成果は ADR として docs/decisions/ に残す
+labels: ["type:spike"]
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: 親エピック
+      placeholder: "#2"
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: 明らかにしたいこと
+      description: このスパイクで答える問い
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: 比較する候補・検証項目
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: input
+    id: timebox
+    attributes:
+      label: タイムボックス
+      placeholder: 例) 1 日
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件
+      value: |
+        - [ ] 比較結果と決定が ADR（docs/decisions/）として記録されている
+        - [ ] `vp check` / `vp test` が通る
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依存
+  - type: markdown
+    attributes:
+      value: |
+        ## ブランチ / PR
+        `spike/<issue番号>-<slug>` で作業し、PR 本文に `Closes #<この issue>` を記載する。コードは捨ててよいが結論は ADR に残す（CONTRIBUTING.md）。

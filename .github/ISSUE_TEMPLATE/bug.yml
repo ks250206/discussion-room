@@ -1,0 +1,57 @@
+name: Bug
+description: 不具合の報告
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: 何が起きているか
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      value: |
+        1.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+      description: エラーメッセージ・ログ・スクリーンショットがあれば添える
+    validations:
+      required: true
+  - type: dropdown
+    id: data-impact
+    attributes:
+      label: 研究データへの影響
+      description: 保存済みのデータ・計算結果・来歴（Provenance）が誤る、または失われる可能性があるか
+      options:
+        - なし（表示や操作のみ）
+        - あり（データ・計算結果・来歴が誤る / 失われる）
+        - 不明
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境
+      value: |
+        - コミット / バージョン:
+        - OS:
+        - ブラウザ:
+        - Node:
+  - type: markdown
+    attributes:
+      value: |
+        ## ブランチ / PR
+        `fix/<issue番号>-<slug>` で作業し、PR 本文に `Closes #<この issue>` を記載する（CONTRIBUTING.md）。
