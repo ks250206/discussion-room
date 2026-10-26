@@ -1,13 +1,18 @@
-import { type AddressInfo, connect } from "node:net";
+import { connect } from "node:net";
 import { afterAll, beforeAll, expect, test } from "vite-plus/test";
 import { createAppServer } from "./app.ts";
 
 const server = createAppServer();
+let port = 0;
 let baseUrl = "";
 
 beforeAll(async () => {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as AddressInfo;
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("expected the server to listen on a TCP port");
+  }
+  port = address.port;
   baseUrl = `http://127.0.0.1:${port}`;
 });
 
@@ -31,7 +36,6 @@ test("unknown routes return 404", async () => {
 });
 
 test("an unparsable request target returns 400 and keeps the server alive", async () => {
-  const { port } = server.address() as AddressInfo;
   const rawResponse = await new Promise<string>((resolve, reject) => {
     const socket = connect(port, "127.0.0.1", () => {
       socket.end("GET http://[ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
