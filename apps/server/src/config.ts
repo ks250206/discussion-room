@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
+import * as v from "valibot";
 
 export const defaultHost = "127.0.0.1";
 export const defaultPort = 8787;
@@ -19,7 +20,8 @@ export type ServerConfig = {
 export type ServerConfigError =
   | { code: "invalid_port"; value: string }
   | { code: "invalid_host"; value: string }
-  | { code: "invalid_data_dir"; value: string };
+  | { code: "invalid_data_dir"; value: string }
+  | { code: "invalid_cli"; value: string };
 
 export type ServerConfigResult =
   | { ok: true; value: ServerConfig }
@@ -30,20 +32,27 @@ export type DevProxyTarget = {
   ws: string;
 };
 
-const parsePort = (value: string): number | undefined => {
-  if (!/^[0-9]{1,5}$/.test(value)) {
-    return undefined;
-  }
-  const port = Number(value);
-  if (port < 1 || port > 65535) {
-    return undefined;
-  }
-  return port;
-};
+const configSchema = v.strictObject({
+  port: v.pipe(
+    v.string(),
+    v.regex(/^[0-9]{1,5}$/),
+    v.transform(Number),
+    v.minValue(1),
+    v.maxValue(65535),
+  ),
+  // LAN binding requires an explicit opt-in and Room token in #45.
+  host: v.picklist(["127.0.0.1", "::1", "localhost"]),
+  dataDir: v.pipe(
+    v.string(),
+    v.check((value) => value.trim().length > 0 && !value.includes("\0")),
+  ),
+});
 
-// LAN binding requires an explicit opt-in and Room token in #45.
-const isValidHost = (value: string): boolean =>
-  value === "127.0.0.1" || value === "::1" || value === "localhost";
+const cliNames = new Map([
+  ["--port", "PORT"],
+  ["--host", "HOST"],
+  ["--data-dir", "DATA_DIR"],
+]);
 
 /**
  * `apps/server/src/main.ts` and the bundled `apps/server/dist/main.mjs` are the
@@ -71,37 +80,49 @@ export const applyEnvFileIfPresent = (envFile: string): void => {
   loadEnvFile(envFile);
 };
 
+/** CLI > process environment > repository .env > defaults. No positional/unknown/duplicate flags. */
 export const loadServerConfig = (
   env: Readonly<Record<string, string | undefined>>,
   rootDir: string,
+  args: readonly string[] = [],
 ): ServerConfigResult => {
-  const portRaw = env["PORT"];
-  const port = portRaw === undefined ? defaultPort : parsePort(portRaw);
-  if (port === undefined) {
-    return { ok: false, error: { code: "invalid_port", value: portRaw ?? "" } };
+  const overrides: Record<string, string> = {};
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    const separator = arg.indexOf("=");
+    const name = separator < 0 ? arg : arg.slice(0, separator);
+    const key = cliNames.get(name);
+    if (key === undefined || overrides[key] !== undefined) {
+      return { ok: false, error: { code: "invalid_cli", value: arg } };
+    }
+    const value = separator < 0 ? args[++index] : arg.slice(separator + 1);
+    if (value === undefined || value.startsWith("--")) {
+      return { ok: false, error: { code: "invalid_cli", value: arg } };
+    }
+    overrides[key] = value;
   }
-
-  const hostRaw = env["HOST"];
-  const host = hostRaw === undefined ? defaultHost : hostRaw;
-  if (!isValidHost(host)) {
-    return { ok: false, error: { code: "invalid_host", value: hostRaw ?? "" } };
+  const input = {
+    port: overrides["PORT"] ?? env["PORT"] ?? String(defaultPort),
+    host: overrides["HOST"] ?? env["HOST"] ?? defaultHost,
+    dataDir: overrides["DATA_DIR"] ?? env["DATA_DIR"] ?? defaultDataDir,
+  };
+  const parsed = v.safeParse(configSchema, input);
+  if (!parsed.success) {
+    const key = parsed.issues[0].path?.[0]?.key;
+    if (key === "port") return { ok: false, error: { code: "invalid_port", value: input.port } };
+    if (key === "host") return { ok: false, error: { code: "invalid_host", value: input.host } };
+    return { ok: false, error: { code: "invalid_data_dir", value: input.dataDir } };
   }
-
-  const dataDirRaw = env["DATA_DIR"];
-  const dataDirInput = dataDirRaw === undefined ? defaultDataDir : dataDirRaw;
-  if (dataDirInput.length === 0 || dataDirInput.includes("\0")) {
-    return { ok: false, error: { code: "invalid_data_dir", value: dataDirInput } };
-  }
-
   return {
     ok: true,
-    value: {
-      host,
-      port,
-      dataDir: resolve(rootDir, dataDirInput),
-    },
+    value: { ...parsed.output, dataDir: resolve(rootDir, parsed.output.dataDir) },
   };
 };
+
+export const productionPaths = (repoRoot: string): { webRoot: string; pyodideRoot: string } => ({
+  webRoot: resolve(repoRoot, "apps/web/dist"),
+  pyodideRoot: resolve(repoRoot, "apps/web/dist/pyodide"),
+});
 
 export const devProxyTarget = (config: Pick<ServerConfig, "host" | "port">): DevProxyTarget => {
   const host = config.host.includes(":") ? `[${config.host}]` : config.host;
@@ -113,6 +134,8 @@ export const devProxyTarget = (config: Pick<ServerConfig, "host" | "port">): Dev
 
 export const formatServerConfigError = (error: ServerConfigError): string => {
   switch (error.code) {
+    case "invalid_cli":
+      return `Invalid argument ${JSON.stringify(error.value)}. Use --port, --host, or --data-dir once with a value.`;
     case "invalid_port":
       return `Invalid PORT ${JSON.stringify(error.value)}. Use an integer from 1 to 65535.`;
     case "invalid_host":

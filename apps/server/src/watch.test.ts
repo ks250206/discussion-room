@@ -50,9 +50,15 @@ test("node --watch restarts the server when an imported source file changes", as
       recursive: true,
     });
     await writeFile(join(serverRoot, "package.json"), '{ "type": "module" }\n');
-    const wsPackage = await realpath(fileURLToPath(new URL("../node_modules/ws", import.meta.url)));
     await mkdir(join(serverRoot, "node_modules"));
-    await symlink(wsPackage, join(serverRoot, "node_modules", "ws"));
+    for (const name of ["ws", "hono", "@hono/node-server", "valibot"]) {
+      const target = await realpath(
+        fileURLToPath(new URL(`../node_modules/${name}`, import.meta.url)),
+      );
+      if (name.startsWith("@"))
+        await mkdir(join(serverRoot, "node_modules", "@hono"), { recursive: true });
+      await symlink(target, join(serverRoot, "node_modules", name));
+    }
 
     child = spawn(process.execPath, ["--watch", "src/main.ts"], {
       cwd: serverRoot,

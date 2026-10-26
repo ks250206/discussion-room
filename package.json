@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vp run -r --parallel dev",
     "build": "vp run -r build",
-    "ready": "vp check && vp test && vp run -r build"
+    "ready": "vp check && vp test && vp run -r build",
+    "start": "node apps/server/dist/main.mjs"
   },
   "devDependencies": {
     "@types/node": "catalog:",
