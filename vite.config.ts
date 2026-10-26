@@ -1,4 +1,9 @@
+import { builtinModules } from "node:module";
 import { defineConfig } from "vite-plus";
+
+const nodeBuiltinNames = [
+  ...new Set(builtinModules.map((name) => name.replace(/^node:/, "").split("/")[0] ?? name)),
+].join("|");
 
 export default defineConfig({
   defaultPackage: "./apps/web",
@@ -57,7 +62,7 @@ export default defineConfig({
             {
               patterns: [
                 {
-                  regex: "^(node:|react(-dom)?($|/))",
+                  regex: `^(node:|(${nodeBuiltinNames}|react|react-dom)($|/))`,
                   message:
                     "Shared packages must stay platform-agnostic: no Node built-ins or React.",
                 },

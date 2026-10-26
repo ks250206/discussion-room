@@ -44,7 +44,7 @@ Oxlint を使い、`typeAware` と `typeCheck` を有効にしている（型情
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/web/**`         | `react` / `jsx-a11y` プラグインを追加し、ブラウザ環境にする。フックの規則と effect の依存配列は correctness カテゴリで検査される。`only-export-components` も error。 |
 | `apps/server/**`      | Node 環境にし、`no-console` を許可する。                                                                                                                             |
-| `packages/**`         | `node:*`・`react`・`react-dom` の import を禁止する（`no-restricted-imports`）。共有パッケージは Web とサーバーの両方から使うため、プラットフォームに依存させない。 |
+| `packages/**`         | Node 組み込みモジュール（`node:fs` も `fs/promises` も。一覧は `node:module` の `builtinModules` から生成）・`react`・`react-dom` の import を禁止する（`no-restricted-imports`）。共有パッケージは Web とサーバーの両方から使うため、プラットフォームに依存させない。 |
 | `packages/domain/**`  | class を禁止する（後述の `discussion-room/no-class`）。                                                                                                              |
 | `**/*.test.{ts,tsx}`  | `vitest` プラグインを追加し、`no-focused-tests`・`no-disabled-tests`・`no-identical-title` を error にする。                                                         |
 
@@ -68,7 +68,7 @@ Oxfmt の既定値（ダブルクォート、セミコロンあり、末尾カ�
 
 - `any` の使用、未使用変数、フォーマット崩れ
 - `packages/domain` 内の `class`（`packages/protocol` では検出しない）
-- 共有パッケージからの `node:fs` / `react` の import
+- 共有パッケージからの `node:fs` / `fs/promises` / `path` / `react` / `react/jsx-runtime` の import（`fsx` のような似た名前や相対 import は対象外）
 - 条件付きのフック呼び出し、effect の依存配列の漏れ
 - `test.only`
 - `noUncheckedIndexedAccess` による `number | undefined` の代入
