@@ -5,6 +5,8 @@
 > 版: v0.1.0（初期設計）  
 > 作成日: 2026-10-26  
 > 想定運用: 研究者個人のローカルファースト利用から開始し、研究室内共有へ段階的に拡張
+>
+> **改訂の参照（2026-10-26）:** 本書と食い違う箇所は [implementation-plan.md](./implementation-plan.md) の「0. 前提の改訂」を優先する。対応する設計判断は [ADR-008](./decisions/008-local-server.md)、[ADR-009](./decisions/009-command-event-sync.md)、[ADR-010](./decisions/010-project-room-identity.md)。これらは設計判断であり、実装の完了ではない。
 
 ---
 
@@ -1060,6 +1062,8 @@ Performance目標は保証値ではない。実装後に実機測定し、条件
 | ADR-005 | DataflowはDAG、Semantic Graphは一般グラフ | 実行順序と研究知識の関係を分離 | 原則維持 |
 | ADR-006 | AI変更は必ず差分承認 | 信頼性・科学的責任・監査可能性 | 原則維持 |
 | ADR-007 | 出典のない定量主張は確定表示しない | AIハルシネーション対策 | 原則維持 |
+
+ADR-001 は [ADR-008](./decisions/008-local-server.md) が置き換える（設計判断。実装は未了）。同期は [ADR-009](./decisions/009-command-event-sync.md)、Room と識別は [ADR-010](./decisions/010-project-room-identity.md)。差分の一覧は [implementation-plan.md](./implementation-plan.md) の「0. 前提の改訂」。
 
 ---
 
