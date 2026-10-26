@@ -69,7 +69,7 @@ test("static build and preview config ignore invalid development-only settings",
 });
 
 test("Vite proxies only /api paths and exact /ws, preserving query strings", async () => {
-  const app = createAppServer();
+  const app = createAppServer({ development: true });
   const previous = { ...process.env };
   const fixtureRoot = await mkdtemp(join(tmpdir(), "discussion-room-proxy-"));
   const webRoot = join(fixtureRoot, "apps", "web");
@@ -90,6 +90,10 @@ test("Vite proxies only /api paths and exact /ws, preserving query strings", asy
     await symlink(
       fileURLToPath(new URL("../../web/node_modules", import.meta.url)),
       join(webRoot, "node_modules"),
+    );
+    await symlink(
+      fileURLToPath(new URL("../node_modules", import.meta.url)),
+      join(serverRoot, "node_modules"),
     );
     const port = await listen(app);
     process.env["HOST"] = "127.0.0.1";
@@ -116,6 +120,21 @@ test("Vite proxies only /api paths and exact /ws, preserving query strings", asy
     });
     expect(health.status).toBe(200);
     expect(await health.json()).toEqual({ status: "ok" });
+    const browserOrigin = new URL(localUrl).origin;
+    expect(
+      (
+        await fetch(new URL(`${devApiPrefix}/health`, localUrl), {
+          headers: { origin: browserOrigin },
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await fetch(new URL(`${devApiPrefix}/health`, localUrl), {
+          headers: { origin: "https://evil.example" },
+        })
+      ).status,
+    ).toBe(403);
 
     for (const path of ["/api", "/api?probe=1"]) {
       const response = await fetch(new URL(path, localUrl), { signal: AbortSignal.timeout(5_000) });
@@ -124,11 +143,17 @@ test("Vite proxies only /api paths and exact /ws, preserving query strings", asy
     for (const path of ["/apiary", "/wsfoo", "/ws/subpath"]) {
       await fetch(new URL(path, localUrl), { signal: AbortSignal.timeout(5_000) });
     }
-    expect(backendRequests).toEqual(["/api/health?probe=1", "/api", "/api?probe=1"]);
+    expect(backendRequests).toEqual([
+      "/api/health?probe=1",
+      "/api/health",
+      "/api/health",
+      "/api",
+      "/api?probe=1",
+    ]);
 
     const wsUrl = new URL(`${devWebSocketPath}?probe=1`, localUrl);
     wsUrl.protocol = "ws:";
-    const socket = new WebSocket(wsUrl);
+    const socket = new WebSocket(wsUrl, { origin: browserOrigin });
     try {
       await new Promise<void>((resolve, reject) => {
         socket.once("open", () => resolve());

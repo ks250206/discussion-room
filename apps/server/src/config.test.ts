@@ -127,3 +127,59 @@ test("loads .env with Node's parser and does not override existing variables", a
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("CLI overrides env per field with separate or equals syntax", () => {
+  expect(
+    loadServerConfig({ PORT: "bad", HOST: "0.0.0.0", DATA_DIR: "env" }, repoRoot, [
+      "--port",
+      "4000",
+      "--host=::1",
+      "--data-dir",
+      "CLI folder",
+    ]),
+  ).toEqual({
+    ok: true,
+    value: { port: 4000, host: "::1", dataDir: resolve(repoRoot, "CLI folder") },
+  });
+  expect(loadServerConfig({ PORT: "4242" }, repoRoot, ["--data-dir=/tmp/data"])).toMatchObject({
+    ok: true,
+    value: { port: 4242, dataDir: "/tmp/data" },
+  });
+});
+
+test.each([
+  ["--unknown=123"],
+  ["--port"],
+  ["--host", "--port", "4000"],
+  ["4000"],
+  ["--port=4000", "--port=4001"],
+  ["--"],
+])("rejects unsupported, missing, positional, or duplicate CLI arguments: %j", (...args) => {
+  expect(loadServerConfig({}, repoRoot, args)).toMatchObject({
+    ok: false,
+    error: { code: "invalid_cli" },
+  });
+});
+
+test.each([" 42", "42 ", "1e3", "3.5", "+4000", "-1", "Infinity", "NaN", "65536", ""])(
+  "strictly validates port %j using Valibot",
+  (PORT) => {
+    expect(loadServerConfig({ PORT }, repoRoot).ok).toBe(false);
+  },
+);
+
+test("validates CLI values and rejects whitespace-only or NUL data paths", () => {
+  expect(loadServerConfig({}, repoRoot, ["--host=0.0.0.0"]).ok).toBe(false);
+  expect(loadServerConfig({}, repoRoot, ["--port=0"]).ok).toBe(false);
+  expect(loadServerConfig({}, repoRoot, ["--data-dir="]).ok).toBe(false);
+  expect(loadServerConfig({ DATA_DIR: "  " }, repoRoot).ok).toBe(false);
+  expect(loadServerConfig({ DATA_DIR: "foo\0bar" }, repoRoot).ok).toBe(false);
+});
+
+test("production asset paths are resolved from the repository layout, not cwd", async () => {
+  const { productionPaths } = await import("./config.ts");
+  expect(productionPaths("/repo")).toEqual({
+    webRoot: "/repo/apps/web/dist",
+    pyodideRoot: "/repo/apps/web/dist/pyodide",
+  });
+});

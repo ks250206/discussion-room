@@ -40,6 +40,7 @@ export default defineConfig(({ command, isPreview }) => {
         },
         [`^${devWebSocketPath}(?:\\?|$)`]: {
           target: target.ws,
+          changeOrigin: true,
           ws: true,
         },
       },

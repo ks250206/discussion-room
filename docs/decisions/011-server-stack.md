@@ -98,3 +98,15 @@ vp run --filter ./apps/server spike:start /tmp/discussion-room-spike.sqlite
 - `pnpm install` / `pnpm install --frozen-lockfile`（`vp` が解決した固定 Node 環境）、`vp check`、`vp test`（全 11 ファイル・108 テスト）、`vp build`、`vp run -r build`、スパイク用 `spike:build`、`git diff --check` が成功した。
 
 これらは選定スタックの機能確認であり、性能、二つのブラウザの Room 同期、クラッシュ耐性、全 OS の prebuilt や配布検証、研究データの保存・復元の完了を示すものではない。
+
+
+## #38 本体への採用（2026-10-27）
+
+`apps/server/src/app.ts` に Hono + `@hono/node-server` の request listener と直接 `ws` を採用した。HTTP / WS の Host・Origin 検証は raw request 境界で共通化し、upgrade 前に適用する。設定は Valibot で検証し CLI 上書きを追加した。production bundle は `apps/web/dist` とその `pyodide/` 配下を単一ポートで配信し、静的配信の traversal / symlink / dotfile 防止と bounded shutdown を検証する。Pyodide の配布物自体は #26、SQLite repository は #39、LAN 公開・トークンは #45 に残す。
+
+分離した `spikes/server-stack` と専用 scripts は、SQLite と transport 選定の再現用に保持する。本体からは import しない。本体の Hono / node-server / Valibot / ws 依存はすべて使用済みで、スパイク専用の追加依存はない。本体の production start とスパイクの start を区別し、スパイクの SQLite probe を製品 API や永続化として扱わない。
+
+Hono の Node API と static 配信の cwd 制約は [現行 Node ガイド](https://hono.dev/docs/getting-started/nodejs) を Context7 経由で再確認した。静的配信は cwd 基準の `serveStatic` に任せず、entry layout から決まる root と検査済み file descriptor を使用する。
+
+
+#38 の手動検証では、ビルド後にルートの `pnpm start --port <port> --host 127.0.0.1` を起動し、同じポートの UI、`/api/health`、生成された JS asset の 200 応答を確認した。さらに production bundle と依存を隔離した一時配置にコピーし、別 cwd から起動して UI / API / fixture Wasm（`application/wasm`）の配信、`.env` の非変更、未作成の DATA_DIR、終了ログを確認した。Wasm は配信確認用 fixture であり Pyodide 本体ではない。親エージェント側で実際の `pnpm start` と Chrome の表示確認も行った。

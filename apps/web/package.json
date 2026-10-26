@@ -20,6 +20,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "typescript": "catalog:",
+    "valibot": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   }
