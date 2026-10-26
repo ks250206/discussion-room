@@ -1,0 +1,52 @@
+name: Feature
+description: 機能追加・基盤整備の sub-issue
+labels: ["type:feature"]
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: 親エピック
+      description: 親 issue の番号
+      placeholder: "#6"
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: 何を実現するか
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: やること
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件
+      description: 確認方法が分かる粒度で書く。科学的制約（欠損値・単位・AI 出力の出自）に関わる場合はそれも含める。
+      value: |
+        - [ ]
+        - [ ] `vp check` / `vp test` が通る
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依存
+      placeholder: "- #16 pnpm workspace と Vite+ でモノレポを初期化"
+  - type: textarea
+    id: references
+    attributes:
+      label: 参照
+      placeholder: "- docs/implementation-plan.md §1.4"
+  - type: markdown
+    attributes:
+      value: |
+        ## ブランチ / PR
+        `feat/<issue番号>-<slug>` で作業し、PR 本文に `Closes #<この issue>` を記載する（CONTRIBUTING.md）。
