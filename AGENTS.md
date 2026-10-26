@@ -29,6 +29,7 @@ vp check --fix                     # fmt と自動修正可能な lint を適用
 vp test                            # 全パッケージのテスト
 vp build                           # apps/web のビルド
 vp run -r build                    # 全パッケージの build スクリプト
+pnpm dev                           # web と server（vp run -r --parallel dev）
 vp run --filter ./apps/web dev     # web dev server
 vp run --filter ./apps/server dev  # server（node --watch）
 ```

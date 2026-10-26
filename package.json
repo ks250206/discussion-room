@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp run --filter ./apps/web dev",
+    "dev": "vp run -r --parallel dev",
     "build": "vp run -r build",
     "ready": "vp check && vp test && vp run -r build"
   },
