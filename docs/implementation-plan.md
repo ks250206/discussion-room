@@ -73,7 +73,7 @@ discussion-room/
 ├── packages/
 │   ├── domain/       # 型・Valibotスキーマ・純粋関数（Command適用、グラフ検証、物理量）
 │   ├── protocol/     # WSメッセージスキーマとバージョン
-│   └── materials/    # 元素・イオン半径・組成計算（純粋関数 + 版固定データ）
+│   └── materials/    # 元素・イオン半径・組成計算（純粋関数。第三者物性表は同梱しない: ADR-012）
 ├── tests/e2e/        # Playwright（server + web を起動、複数クライアント）
 ├── docs/
 │   ├── concept.md
@@ -84,6 +84,7 @@ discussion-room/
 └── AGENTS.md
 ```
 
+- 材料データは [ADR-012](./decisions/012-scientific-data-sources.md) に従い、初期版では第三者物性表を同梱せず、利用者持ち込み・原単位と精度の保持・欠損理由の明示を採る。Room = Project の通常の同期・完全な ZIP 往復を前提として、第三者表は同 ADR の利用範囲ゲートを Project 確定前に通す。範囲外の共有・出力は欠落で隠さず拒否し、公開サンプルへの第三者表の収録には別途同梱ゲートを要する（読込とゲートの実装は未了）。
 - 開発: `vp run -r --parallel dev`（web の Vite dev server が `/api` `/ws` をサーバーへ proxy）。
 - 本番相当: `pnpm start` で web をビルド済み静的ファイルとしてサーバーが配信（単一ポート）。
 - 品質: `vp check`（fmt + lint + typecheck）、`vp test`、`vp build` を CI で実行。
