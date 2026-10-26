@@ -27,3 +27,5 @@ title/name/kind/author は空白だけの文字列も拒否する。判定のた
 同一 Project の複数 Board から同じ Artifact を参照でき、CanvasItem がゼロになった Artifact も有効。`removeCanvasItem(snapshot, id)` は配置配列のみを作り直し、Artifact・履歴を保持する純粋関数で、存在しない配置は `Result` で失敗する。入力は検証済み snapshot とし、version の更新・Command/Event・履歴記録・永続化は後続の適用層で行う。
 
 参照: [concept.md §7.1–7.2](./concept.md)、[implementation-plan.md §1.1 / §1.3](./implementation-plan.md)、[Valibot strictObject](https://valibot.dev/api/strictObject/)。
+
+3 種類の線とポートの構造・参照検証は [グラフ検証](./domain-graphs.md) を参照。

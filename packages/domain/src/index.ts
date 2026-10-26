@@ -55,3 +55,29 @@ export {
   type OriginType,
   type Provenance,
 } from "./provenance.ts";
+export {
+  arePortTypesCompatible,
+  DataflowEdgeSchema,
+  GraphSnapshotSchema,
+  ItemPortsSchema,
+  PortDataTypeSchema,
+  PortDefinitionSchema,
+  PortDirectionSchema,
+  SemanticRelationSchema,
+  SemanticRelationTypeSchema,
+  VisualConnectorSchema,
+  type DataflowEdge,
+  type GraphSnapshot,
+  type ItemPorts,
+  type PortDataType,
+  type PortDefinition,
+  type PortDirection,
+  type SemanticRelation,
+  type SemanticRelationType,
+  type VisualConnector,
+} from "./graphs.ts";
+export {
+  validateGraphSnapshot,
+  type GraphReferenceError,
+  type GraphReferenceIssue,
+} from "./graph-validation.ts";
