@@ -7,13 +7,17 @@
     "dev": "vp dev",
     "build": "vp build",
     "preview": "vp preview",
-    "test": "vp test"
+    "test": "vp test",
+    "spike:pyodide": "vp dev --config vite.pyodide-spike.config.ts",
+    "spike:pyodide:build": "vp build --config vite.pyodide-spike.config.ts",
+    "spike:pyodide:preview": "vp preview --config vite.pyodide-spike.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
     "@discussion-room/domain": "workspace:*",
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
+    "pyodide": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
