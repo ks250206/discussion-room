@@ -7,15 +7,20 @@
     "dev": "vp dev",
     "build": "vp build",
     "preview": "vp preview",
-    "test": "vp test"
+    "test": "vp test",
+    "spike:canvas": "vp dev --config vite.canvas-spike.config.ts",
+    "spike:canvas:build": "vp build --config vite.canvas-spike.config.ts",
+    "spike:canvas:preview": "vp preview --config vite.canvas-spike.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
     "@discussion-room/domain": "workspace:*",
+    "@xyflow/react": "catalog:",
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-markdown": "catalog:"
   },
   "devDependencies": {
     "@tailwindcss/vite": "catalog:",
