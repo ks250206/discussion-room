@@ -11,6 +11,7 @@ dist-ssr
 dist-spike
 dist-room-spike
 dist-canvas-spike
+dist-pyodide-spike
 *.local
 *.tsbuildinfo
 

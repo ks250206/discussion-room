@@ -9,5 +9,6 @@ ADR-001〜007 は [concept.md §17](../concept.md#17-設計判断ログadr簡易
 - [ADR-012: 科学データの出典、再配布、欠損の表現](./012-scientific-data-sources.md)
 - [ADR-013: Project Room の最小往復と計測](./013-room-roundtrip-spike.md)
 - [ADR-014: React Flow カードと装飾オーバーレイの座標同期](./014-canvas-overlay-spike.md)
+- [ADR-015: Pyodide module Worker と terminate による停止・再起動](./015-pyodide-worker-stop.md)
 
 新しい ADR は、ステータス・日付・関連 Issue、文脈、決定、代替案、結果、参照を記録する。判断を変更する場合は新しい ADR から旧判断を参照し、置き換える範囲を明示する。

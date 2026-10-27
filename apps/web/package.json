@@ -10,7 +10,10 @@
     "test": "vp test",
     "spike:canvas": "vp dev --config vite.canvas-spike.config.ts",
     "spike:canvas:build": "vp build --config vite.canvas-spike.config.ts",
-    "spike:canvas:preview": "vp preview --config vite.canvas-spike.config.ts"
+    "spike:canvas:preview": "vp preview --config vite.canvas-spike.config.ts",
+    "spike:pyodide": "vp dev --config vite.pyodide-spike.config.ts",
+    "spike:pyodide:build": "vp build --config vite.pyodide-spike.config.ts",
+    "spike:pyodide:preview": "vp preview --config vite.pyodide-spike.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
@@ -18,6 +21,7 @@
     "@xyflow/react": "catalog:",
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
+    "pyodide": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-markdown": "catalog:"
