@@ -800,12 +800,12 @@ describe("migrations", () => {
     repository.close();
     expect(success(reopen(path).listProjects())).toEqual([project]);
   });
-  test("migrates populated v2 data and logs to indexed v3 without changing payloads", () => {
+  test("migrates populated v2 data and logs to the latest indexed version without changing payloads", () => {
     const { path, repository } = fixture();
     success(repository.commit(command(state())));
     repository.close();
     const old = new DatabaseSync(path);
-    // Produce an authentic v2 layout: only application-owned v3 indexes are removed.
+    // Produce an authentic v2 layout: application-owned later indexes are removed.
     const indexes = old
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL")
       .all();
@@ -821,7 +821,9 @@ describe("migrations", () => {
     expect(success(upgraded.readAudit(id(1)))).toHaveLength(1);
     const check = new DatabaseSync(path);
     try {
-      expect(check.prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 3 });
+      expect(check.prepare("PRAGMA user_version").get()).toMatchObject({
+        user_version: DATABASE_VERSION,
+      });
       const plan = check
         .prepare("EXPLAIN QUERY PLAN SELECT id FROM canvas_items WHERE project_id = ? ORDER BY id")
         .all(id(1));
@@ -839,6 +841,29 @@ describe("migrations", () => {
         ),
       ).toBe(true);
       expect(check.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    } finally {
+      check.close();
+    }
+  });
+
+  test("migrates v3 to the resource index while preserving opaque metadata and logs", () => {
+    const { path, repository } = fixture();
+    success(repository.commit(command(state())));
+    repository.close();
+    const old = new DatabaseSync(path);
+    old.exec("DROP INDEX blobs_content_project; PRAGMA user_version = 3");
+    old.close();
+    const upgraded = reopen(path);
+    expect(success(upgraded.readProject(id(1)))).toEqual({ seq: 1, state: state() });
+    expect(success(upgraded.readAudit(id(1)))).toHaveLength(1);
+    const check = new DatabaseSync(path);
+    try {
+      expect(check.prepare("PRAGMA user_version").get()).toMatchObject({
+        user_version: DATABASE_VERSION,
+      });
+      expect(
+        check.prepare("SELECT name FROM sqlite_master WHERE name = 'blobs_content_project'").get(),
+      ).toMatchObject({ name: "blobs_content_project" });
     } finally {
       check.close();
     }

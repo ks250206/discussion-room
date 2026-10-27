@@ -14,3 +14,11 @@ export {
   type StoredAudit,
 } from "./models.ts";
 export type { JsonValue, JsonObject } from "./json.ts";
+export {
+  StoredBlobSchema,
+  Sha256Schema,
+  BlobFilenameSchema,
+  BlobMimeSchema,
+  type StoredBlob,
+  type BlobRegistration,
+} from "./blob-model.ts";
