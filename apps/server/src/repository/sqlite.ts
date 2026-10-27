@@ -12,6 +12,12 @@ import {
 import { equalJson, isLosslessJson } from "./json.ts";
 import { migrateDatabase } from "./migrations.ts";
 import {
+  StoredBlobSchema,
+  Sha256Schema,
+  type StoredBlob,
+  type BlobRegistration,
+} from "./blob-model.ts";
+import {
   CommitSchema,
   SequenceSchema,
   StoredAuditSchema,
@@ -487,6 +493,21 @@ export function openSqliteRepository(path: string): Result<Repository, Repositor
         if (!auditIntegrity.ok) return auditIntegrity;
         const before = readState(command.projectId);
         if (!before.ok) return before;
+        // Resources may arrive after this graph snapshot was read, without advancing event seq.
+        // Only verified registry entries are merged; opaque history still requires full retention.
+        const incomingIds = new Set(command.state.blobs.map((blob) => blob.id));
+        const registered = before.value?.blobs.filter((blob) => "storage" in blob) ?? [];
+        for (const blob of command.state.blobs) {
+          if ("storage" in blob && !registered.some((entry) => equalJson(entry, blob)))
+            return invalid("Content resources must be registered through registerBlob");
+        }
+        const nextState: ProjectState = {
+          ...command.state,
+          blobs: [
+            ...command.state.blobs,
+            ...registered.filter((blob) => !incomingIds.has(blob.id)),
+          ],
+        };
         const empty: ProjectState = {
           ...command.state,
           graph: {
@@ -497,7 +518,7 @@ export function openSqliteRepository(path: string): Result<Repository, Repositor
             visualConnectors: [],
           },
         };
-        const versions = checkVersions(before.value ?? empty, command.state);
+        const versions = checkVersions(before.value ?? empty, nextState);
         if (!versions.ok) return versions;
         // project rows and durable logs are retained; only the supplied project aggregate is replaced.
         for (const spec of tables.toReversed()) {
@@ -511,7 +532,7 @@ export function openSqliteRepository(path: string): Result<Repository, Repositor
           const write = database.prepare(
             `INSERT INTO ${spec.table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})${spec.table === "projects" ? " ON CONFLICT(id) DO UPDATE SET document = excluded.document" : ""}`,
           );
-          for (const value of spec.data(command.state)) {
+          for (const value of spec.data(nextState)) {
             const indices = indexValues(spec, value, command.projectId);
             if (!indices.ok) return indices;
             write.run(...indices.value, encodeDocument(value));
@@ -548,6 +569,42 @@ export function openSqliteRepository(path: string): Result<Repository, Repositor
       const id = validate(IdSchema, projectId);
       if (!id.ok) return invalid("Invalid project id");
       return transaction(false, () => readAudits(id.value));
+    },
+    registerBlob(input) {
+      if (!isLosslessJson(input)) return invalid("Invalid blob metadata JSON");
+      const parsed = validate(StoredBlobSchema, input);
+      if (!parsed.ok) return invalid("Invalid blob metadata");
+      const blob = parsed.value;
+      return transaction<BlobRegistration>(true, () => {
+        const state = readState(blob.projectId);
+        if (!state.ok) return state;
+        if (!state.value) return invalid("Unknown project");
+        const existing = state.value.blobs.find(
+          (entry): entry is StoredBlob => "storage" in entry && entry.sha256 === blob.sha256,
+        );
+        if (existing)
+          return existing.size === blob.size
+            ? ok({ metadata: existing, deduplicated: true })
+            : invalid("Content hash has inconsistent size");
+        database
+          .prepare("INSERT INTO blobs(id, project_id, document) VALUES (?, ?, ?)")
+          .run(blob.id, blob.projectId, encodeDocument(blob));
+        return ok({ metadata: blob, deduplicated: false });
+      });
+    },
+    readBlob(projectId, sha256) {
+      const id = validate(IdSchema, projectId);
+      const hash = validate(Sha256Schema, sha256);
+      if (!id.ok || !hash.ok) return invalid("Invalid blob lookup");
+      return transaction(false, () => {
+        const state = readState(id.value);
+        if (!state.ok) return state;
+        return ok(
+          state.value?.blobs.find(
+            (entry): entry is StoredBlob => "storage" in entry && entry.sha256 === hash.value,
+          ) ?? null,
+        );
+      });
     },
     close() {
       if (!closed) {

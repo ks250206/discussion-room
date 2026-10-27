@@ -36,7 +36,7 @@ JSON.stringify やスキーマが値を読み出す**前**に、JSON へ損失�
 
 ## DB と migration
 
-SQLite `PRAGMA user_version` を DB 版として、文書の `schemaVersion: 1`、entity.version、event seq と区別する。version 1 は Project / Board / Artifact / Revision / Canvas / graph と port registry、version 2 は opaque metadata / provenance / event / audit、version 3 は Project スコープ検索と外部キー child 列の索引。新規 DB・v1 DB・v2 DB から v3 へ移行し、適用済み版は再適用しない。**全 pending migration と user_version の更新は一つの transaction** で行い、後半の失敗時にも前半の DDL を rollback する。`BEGIN IMMEDIATE` で write lock を取得した後に user_version を読み、他の接続が lock 待機中に移行を終えた場合も再確認する。将来版を検知した transaction も rollback して返す。新しい DB 版を古いコードで開いて downgrade しない。
+SQLite `PRAGMA user_version` を DB 版として、文書の `schemaVersion: 1`、entity.version、event seq と区別する。version 1 は Project / Board / Artifact / Revision / Canvas / graph と port registry、version 2 は opaque metadata / provenance / event / audit、version 3 は Project スコープ検索と外部キー child 列の索引、version 4 は content-addressed blob の Project/hash unique partial index。新規 DB・v1/v2/v3 DB から v4 へ移行し、適用済み版は再適用しない。**全 pending migration と user_version の更新は一つの transaction** で行い、後半の失敗時にも前半の DDL を rollback する。`BEGIN IMMEDIATE` で write lock を取得した後に user_version を読み、他の接続が lock 待機中に移行を終えた場合も再確認する。将来版を検知した transaction も rollback して返す。新しい DB 版を古いコードで開いて downgrade しない。
 
 外部キーを有効にし、Artifact ↔ current Revision 等の相互参照は deferred FK で commit 時に検査する。DB は STRICT tables、JSON 列は json_valid 制約を使う（JSON の意味検証は Valibot が担当）。正常起動時に file DB は WAL、synchronous=FULL、busy timeout 1000 ms。`:memory:` は SQLite の仕様上 WAL ファイルを作れないので in-memory journal のまま。WAL / SHM を手で削除せず、運用バックアップや live DB のコピー手順は別途設計する。
 
@@ -45,3 +45,7 @@ SQLite `PRAGMA user_version` を DB 版として、文書の `schemaVersion: 1`�
 ## 検証
 
 一時 file DB で全モデルの reopen 往復、Project ごとの seq / cursor、独立接続の競合、最後の audit write 失敗 / FK 制約時の rollback、SQL-shaped 文字列、JSON 損失・既知 payload / 参照 / cache 不正、歴史不変・version、placement 除去・再追加、DB 文書破損、AI 出自・実行履歴等の書換え/脱落拒否と新規追記、v1 / v2 移行、索引の query plan、別 Worker の lock 待機中に先行接続が移行する競合、将来版拒否、migration 全体 rollback を統合テストする。
+
+## #43 の content-addressed resource 拡張
+
+[Blob ストアの契約](./blob-store.md)を参照。`ProjectState.blobs` は従来の opaque-unverified 履歴と検証済み byte の `StoredBlob` の union になった。`registerBlob` / `readBlob` は既存 Project の独立した resource registry であり、登録結果は `{metadata, deduplicated}` として新規/再利用を同じ transaction 内で区別する。共有 Graph / DomainEvent / seq を変えない。`commit` は並行登録された不足 resource を保持し、旧 opaque 履歴の省略・書換え拒否は変えない。新規 content resource は `commit` では登録できない。メタデータ構造検証・byte hash の検証・研究者承認・科学的妥当性・利用条件の判断を区別する。
