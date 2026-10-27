@@ -22,6 +22,8 @@
 
 Oxlint を使い、`typeAware` と `typeCheck` を有効にしている（型情報を使うルールと型検査を `vp check` で一度に実行する）。
 
+`docs/evidence/**` は lint の対象外にしている。スパイクの証拠を再現するための手動実行スクリプトを置く場所で、ワークスペースの依存にないツール（E12 以前の Playwright など）を使うため。製品コードとテストは置かない。
+
 ### 全体
 
 - `correctness` と `suspicious` カテゴリを **error** にする。warning は `vp check` を落とさず放置されやすいため、使わない。

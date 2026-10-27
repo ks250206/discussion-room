@@ -1,6 +1,6 @@
 import { loadPyodide } from "pyodide";
 import * as v from "valibot";
-import { validateOutput, pyodideVersion, runtimeIndexUrl } from "./protocol.ts";
+import { validateOutput, pyodideVersion, runtimeIndexPath } from "./protocol.ts";
 import type { Demo } from "./protocol.ts";
 
 const heapSchema = v.object({ _module: v.object({ HEAPU8: v.instance(Uint8Array) }) });
@@ -16,7 +16,7 @@ json.dumps({"sum": float(a.sum()), "mean": float(a.mean()), "count": int(a.size)
 // this spike offers fixed programs and one bounded structured result, not a log stream.
 export async function loadEngine() {
   const runtime = await loadPyodide({
-    indexURL: runtimeIndexUrl,
+    indexURL: new URL(runtimeIndexPath, globalThis.location.href).href,
     stdout: () => {},
     stderr: () => {},
   });

@@ -1,7 +1,8 @@
 import * as v from "valibot";
 
 export const pyodideVersion = "314.0.7";
-export const runtimeIndexUrl = `https://cdn.jsdelivr.net/pyodide/v${pyodideVersion}/full/`;
+// Same-origin path filled by `pnpm pyodide:fetch` (ADR-016); no CDN at runtime.
+export const runtimeIndexPath = `/pyodide/v${pyodideVersion}/`;
 export const outputLimit = 8192;
 const identifier = v.pipe(v.number(), v.integer(), v.minValue(1));
 const measurement = v.pipe(v.number(), v.finite(), v.minValue(0));

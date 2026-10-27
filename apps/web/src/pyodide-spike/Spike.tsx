@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPyodideController, initialSnapshot } from "./controller.ts";
-import { pyodideVersion, runtimeIndexUrl } from "./protocol.ts";
+import { pyodideVersion, runtimeIndexPath } from "./protocol.ts";
 import { createModuleWorkerPort } from "./worker-port.ts";
 import type { WorkerPort } from "./controller.ts";
 
@@ -41,28 +41,27 @@ export function Spike({
   return (
     <main className={dark ? "spike dark" : "spike"}>
       <div className="sheet">
-        <p className="eyebrow">Issue #25 · isolated technical spike</p>
+        <p className="eyebrow">Issue #25 / #26 · isolated technical spike</p>
         <h1>Python Worker の実行と停止</h1>
         <p>Pyodide {pyodideVersion} / NumPy。固定の合成データだけをブラウザー内で計算します。</p>
         <section aria-labelledby="network-heading">
           <h2 id="network-heading">環境のロードは明示操作</h2>
           <p>
-            下のロードボタンを押すと <strong>cdn.jsdelivr.net</strong>{" "}
-            から固定版ランタイム・標準ライブラリー・NumPy をダウンロードします。CDN
-            には通常の接続情報が届きます。研究データやコードを送る API は使用しません。
+            下のロードボタンを押すと、このページを配信しているローカルサーバーから固定版ランタイム・標準ライブラリー・NumPy
+            を読み込みます。外部 CDN には接続しません。研究データやコードを送る API も使用しません。
           </p>
           <p>
-            <code>{runtimeIndexUrl}</code>
+            <code>{runtimeIndexPath}</code>
           </p>
           <p>
-            同梱・オフライン配布は Issue #26
-            の未実装事項です。再起動時も取得が必要になる場合があります。
+            配布物が未配置の場合は 404 でエラーになります。リポジトリで{" "}
+            <code>pnpm pyodide:fetch</code> を実行してから再ロードしてください。
           </p>
           <button
             disabled={busy || state.status === "ready"}
             onClick={() => controller.current?.initialize()}
           >
-            CDN から環境をロード / 再起動
+            ローカル配信から環境をロード / 再起動
           </button>
         </section>
         <section aria-labelledby="run-heading">
