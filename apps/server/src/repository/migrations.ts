@@ -117,8 +117,13 @@ export const MIGRATIONS = [
       CREATE INDEX snapshots_board ON snapshots(board_id, project_id);
     `,
   },
+  {
+    version: 4,
+    sql: `CREATE UNIQUE INDEX blobs_content_project ON blobs(project_id, json_extract(document, '$.value.sha256'))
+      WHERE json_extract(document, '$.value.storage') = 'content-addressed';`,
+  },
 ] as const;
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 4;
 const versionRow = v.object({ user_version: v.pipe(v.number(), v.safeInteger(), v.minValue(0)) });
 
 /** All pending migrations and user_version changes roll back together. */
