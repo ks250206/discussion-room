@@ -17,6 +17,7 @@
     "spike:room:measure": "node src/spikes/room-roundtrip/measure.ts"
   },
   "dependencies": {
+    "@discussion-room/domain": "workspace:*",
     "@hono/node-server": "catalog:",
     "hono": "catalog:",
     "valibot": "catalog:",
