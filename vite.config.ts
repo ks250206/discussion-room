@@ -90,6 +90,8 @@ export default defineConfig({
     options: { typeAware: true, typeCheck: true },
   },
   test: {
+    // Layering tests need real CSS text; ordinary stylesheet imports remain stubbed.
+    css: { include: [/\.css\?raw$/] },
     include: ["{apps,packages}/*/src/**/*.test.{ts,tsx}", "tools/**/*.test.ts"],
   },
   run: {
