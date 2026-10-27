@@ -34,6 +34,11 @@ beforeAll(async () => {
   await writeFile(join(webRoot, "assets", "style.css"), "body { color: black }");
   await writeFile(join(pyodideRoot, "pyodide.mjs"), "export const fixtureOnly = true;");
   await writeFile(join(pyodideRoot, "pyodide.asm.wasm"), Buffer.from([0, 97, 115, 109]));
+  await mkdir(join(pyodideRoot, "v314.0.7"));
+  await writeFile(
+    join(pyodideRoot, "v314.0.7", "pyodide.asm.wasm"),
+    Buffer.from([0, 97, 115, 109]),
+  );
   await writeFile(join(root, "secret.txt"), "PRIVATE fixture");
   await writeFile(join(webRoot, ".env"), "SECRET=hidden");
   await symlink(join(root, "secret.txt"), join(webRoot, "linked.txt"));
@@ -85,6 +90,22 @@ test("one port serves health, web index, Vite assets and local Pyodide fixtures"
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(0);
   }
+});
+
+test("only versioned Pyodide directories are cacheable as immutable", async () => {
+  const versioned = await fetch(`${base}/pyodide/v314.0.7/pyodide.asm.wasm`);
+  expect(versioned.status).toBe(200);
+  expect(versioned.headers.get("content-type")).toContain("application/wasm");
+  expect(versioned.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+  const head = await fetch(`${base}/pyodide/v314.0.7/pyodide.asm.wasm`, { method: "HEAD" });
+  expect(head.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+  for (const path of ["/pyodide/pyodide.asm.wasm", "/assets/main.js", "/"]) {
+    expect((await fetch(`${base}${path}`)).headers.get("cache-control")).toBe("no-cache");
+  }
+  // A missing file in a versioned directory is an uncached 404, not an immutable response.
+  const missing = await fetch(`${base}/pyodide/v314.0.7/scipy.whl`);
+  expect(missing.status).toBe(404);
+  expect(missing.headers.get("cache-control")).toBeNull();
 });
 
 test("HEAD retains MIME and length but has no body; writes never serve static files", async () => {

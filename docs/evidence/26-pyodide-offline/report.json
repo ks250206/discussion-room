@@ -1,0 +1,143 @@
+{
+  "base": "http://127.0.0.1:<ephemeral>",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+  "spike": {
+    "pyodideRequestsBeforeClick": 0,
+    "first": {
+      "result": {
+        "sum": 50005000,
+        "mean": 5000.5,
+        "count": 10000,
+        "numpy": "2.4.6",
+        "python": "3.14.2"
+      },
+      "metrics": [
+        "2870.2 ms",
+        "633.3 ms",
+        "632.2 ms"
+      ],
+      "served": {
+        "requests": 5,
+        "bytes": 16473844
+      }
+    },
+    "afterStop": {
+      "result": {
+        "sum": 50005000,
+        "mean": 5000.5,
+        "count": 10000,
+        "numpy": "2.4.6",
+        "python": "3.14.2"
+      },
+      "metrics": [
+        "2434.8 ms",
+        "551.5 ms",
+        "550.6 ms"
+      ],
+      "served": {
+        "requests": 0,
+        "bytes": 0
+      },
+      "servedPaths": []
+    }
+  },
+  "packages": [
+    {
+      "name": "numpy",
+      "cold": {
+        "runtimeMs": 2330.20000000007,
+        "loadPackageMs": 431.0999999999767,
+        "importMs": 507,
+        "imported": "2.4.6",
+        "served": {
+          "requests": 6,
+          "bytes": 16491775
+        }
+      },
+      "warm": {
+        "runtimeMs": 1951.2000000000698,
+        "loadPackageMs": 385.5999999999767,
+        "importMs": 504.4000000000233,
+        "imported": "2.4.6",
+        "served": {
+          "requests": 0,
+          "bytes": 0
+        }
+      }
+    },
+    {
+      "name": "scipy",
+      "cold": {
+        "runtimeMs": 2335.0999999999767,
+        "loadPackageMs": 2021.3000000000466,
+        "importMs": 703.6999999999534,
+        "imported": "1.18.0",
+        "served": {
+          "requests": 7,
+          "bytes": 30521525
+        }
+      },
+      "warm": {
+        "runtimeMs": 2001.9000000000233,
+        "loadPackageMs": 2054.9000000000233,
+        "importMs": 591.9000000000233,
+        "imported": "1.18.0",
+        "served": {
+          "requests": 0,
+          "bytes": 0
+        }
+      }
+    },
+    {
+      "name": "pandas",
+      "cold": {
+        "runtimeMs": 2430.1999999999534,
+        "loadPackageMs": 877.3000000000466,
+        "importMs": 3232.5,
+        "imported": "3.0.2",
+        "served": {
+          "requests": 10,
+          "bytes": 21420955
+        }
+      },
+      "warm": {
+        "runtimeMs": 1895.1999999999534,
+        "loadPackageMs": 930.4000000000233,
+        "importMs": 3083.1999999999534,
+        "imported": "3.0.2",
+        "served": {
+          "requests": 0,
+          "bytes": 0
+        }
+      }
+    },
+    {
+      "name": "matplotlib",
+      "cold": {
+        "runtimeMs": 2372.5999999999767,
+        "loadPackageMs": 1073.0999999999767,
+        "importMs": 1715.5,
+        "imported": "3.10.8",
+        "served": {
+          "requests": 17,
+          "bytes": 26798136
+        }
+      },
+      "warm": {
+        "runtimeMs": 1993.9000000000233,
+        "loadPackageMs": 1041.5,
+        "importMs": 1673.5999999999767,
+        "imported": "3.10.8",
+        "served": {
+          "requests": 0,
+          "bytes": 0
+        }
+      }
+    }
+  ],
+  "external": [
+    "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide-lock.json"
+  ],
+  "externalProbe": "blocked: Failed to fetch",
+  "serverDown": "Worker が停止しました。環境を再起動できます。 環境を再起動してください。"
+}

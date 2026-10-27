@@ -12,6 +12,9 @@ dist-spike
 dist-room-spike
 dist-canvas-spike
 dist-pyodide-spike
+
+# Pyodide runtime and wheels fetched by `pnpm pyodide:fetch` (ADR-016)
+apps/web/public/pyodide/
 *.local
 *.tsbuildinfo
 

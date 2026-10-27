@@ -12,6 +12,8 @@ export default defineConfig({
     ignorePatterns: ["docs/**"],
   },
   lint: {
+    // Evidence scripts are run by hand with tools outside the workspace (e.g. Playwright before E12).
+    ignorePatterns: ["docs/evidence/**"],
     plugins: ["typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },

@@ -55,7 +55,7 @@ test("StrictMode effect replay keeps lazy initialization, NumPy run and unmount 
     </StrictMode>,
   );
   expect(f.records).toHaveLength(0);
-  await user.click(screen.getByRole("button", { name: "CDN から環境をロード / 再起動" }));
+  await user.click(screen.getByRole("button", { name: "ローカル配信から環境をロード / 再起動" }));
   expect(f.current().sent).toEqual([{ type: "initialize" }]);
   f.respond({ type: "ready", heapBytes: 123 });
   await user.click(screen.getByRole("button", { name: "NumPy を実行" }));
@@ -78,7 +78,7 @@ test("effect recreation with preserved UI state retires the old controller and p
     </StrictMode>,
   );
   await user.click(screen.getByRole("button", { name: "応答テスト: 0" }));
-  await user.click(screen.getByRole("button", { name: "CDN から環境をロード / 再起動" }));
+  await user.click(screen.getByRole("button", { name: "ローカル配信から環境をロード / 再起動" }));
   const queued = old.current().handlers?.message;
   // Fast Refresh also replays effects while preserving UI state. Changing the
   // stable dependency here exercises that lifecycle without a dev-server mock.
@@ -92,7 +92,7 @@ test("effect recreation with preserved UI state retires the old controller and p
   expect(next.records).toHaveLength(0);
   act(() => queued?.({ data: { type: "ready", heapBytes: 999 } }));
   expect(screen.getByRole("button", { name: "NumPy を実行" }).hasAttribute("disabled")).toBe(true);
-  await user.click(screen.getByRole("button", { name: "CDN から環境をロード / 再起動" }));
+  await user.click(screen.getByRole("button", { name: "ローカル配信から環境をロード / 再起動" }));
   expect(next.current().sent).toEqual([{ type: "initialize" }]);
   next.respond({ type: "ready", heapBytes: 123 });
   await user.click(screen.getByRole("button", { name: "NumPy を実行" }));

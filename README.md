@@ -35,6 +35,7 @@ vp run --filter ./apps/server dev # server（node --watch）
 pnpm dev                          # web と server を同時起動
 pnpm build                        # web と server の本番ビルド
 pnpm start                        # ビルド済み web と API を単一ポートで配信
+pnpm pyodide:fetch                # Pyodide ランタイムと wheel を配置（下記）
 ```
 
 ## 画面シェル
@@ -104,16 +105,26 @@ pnpm start --port 9000 --host 127.0.0.1 --data-dir ./local-data
 
 設定の優先順位は **CLI > シェルの環境変数 > リポジトリ `.env` > 既定値**。CLI は `--port` / `--host` / `--data-dir` をそれぞれ 1 回だけ受け付け、未知の引数、位置引数、重複、値の欠落を拒否する。環境変数・CLI とも同じ Valibot スキーマで検証し、無効な値を既定値に置き換えない。相対 `DATA_DIR` は引き続きリポジトリルート基準で、まだ作成・保存しない（#39）。CLI で開発サーバーのポートを変える場合は Vite proxy 側にも同じ `PORT` を設定する。
 
-| URL               | 配信元 / 動作                                                          |
-| ----------------- | ---------------------------------------------------------------------- |
-| `/api/health`     | `GET` / `HEAD`、JSON `{ "status": "ok" }`                              |
-| `/`、web asset    | `apps/web/dist`。`GET` / `HEAD` のみ                                   |
-| `/pyodide/*`      | `apps/web/dist/pyodide` のローカルファイル。Wasm は `application/wasm` |
-| `/ws`（query 可） | transport 確認用の text / binary echo。Room protocol ではない          |
+| URL               | 配信元 / 動作                                                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/health`     | `GET` / `HEAD`、JSON `{ "status": "ok" }`                                                                                                             |
+| `/`、web asset    | `apps/web/dist`。`GET` / `HEAD` のみ                                                                                                                  |
+| `/pyodide/*`      | `apps/web/dist/pyodide` のローカルファイル。Wasm は `application/wasm`。`/pyodide/v<x.y.z>/` 配下は `immutable` でキャッシュ可、それ以外は `no-cache` |
+| `/ws`（query 可） | transport 確認用の text / binary echo。Room protocol ではない                                                                                         |
 
 パスは source / bundle の位置から解決するので、作業ディレクトリに依存しない。別のディレクトリからも `node /absolute/path/to/discussion-room/apps/server/dist/main.mjs --port 9000` で同じ成果物を配信できる。
 
-Pyodide の固定版配布・取得・Worker は **#26 以降で実装する**。この変更は CDN を参照せず、Pyodide 本体をダウンロード・同梱しない。将来 `apps/web/public/pyodide/` に置いた配布物を Vite build が `dist/pyodide/` へコピーする。現在はファイルがなければ 404 になる。テストの `.wasm` は配信確認用 fixture で、Pyodide ランタイムではない。
+### Pyodide の配布物（#26）
+
+Pyodide はブラウザーの module Worker で動き、ランタイムとパッケージはこのサーバーから配信する。実行時に CDN を参照しない。配布物はリポジトリに含めず（`.gitignore`）、次のコマンドで `apps/web/public/pyodide/v314.0.7/` に置く。Vite の dev server はそのまま配信し、`vp build` が `dist/pyodide/` へコピーする。
+
+```sh
+pnpm pyodide:fetch                                        # ランタイム + NumPy（約 16.5 MB）
+pnpm pyodide:fetch --packages numpy,scipy,pandas,matplotlib  # MVP の 4 パッケージと依存（約 45 MB）
+pnpm pyodide:fetch --source /path/to/pyodide-314.0.7/pyodide # 展開済みの公式リリースから（ネットワーク不要）
+```
+
+ランタイム（`pyodide.asm.wasm`、標準ライブラリーなど）は pnpm が integrity を検証した npm パッケージ `pyodide@314.0.7` からコピーする。wheel は既定で `https://cdn.jsdelivr.net/pyodide/v314.0.7/full/` から取得し、npm パッケージ同梱の `pyodide-lock.json` の sha256 と一致したものだけを置く。取得できるのは許可リスト（`numpy` / `scipy` / `pandas` / `matplotlib`）とその依存だけ。取得は一度でよく、以後はオフラインで動く。CDN に届かない環境では、公式リリースの `pyodide-314.0.7.tar.bz2` を展開して `--source` に指定する（同じ sha256 検証を通る）。判断の記録は [ADR-016](docs/decisions/016-pyodide-local-distribution.md)。
 
 HTML の SPA fallback は `Accept: text/html` を持つ拡張子のない UI navigation に限定する。`/api`、`/ws`、`/pyodide`、`/assets` とその配下、存在しない `.js` / `.wasm` などの asset は fallback しない。dotfile、パストラバーサル、symlink ファイル・ディレクトリは配信しない。asset はストリームで送り、`HEAD` は本文を返さない。
 

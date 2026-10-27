@@ -7,11 +7,13 @@
     "dev": "vp run -r --parallel dev",
     "build": "vp run -r build",
     "ready": "vp check && vp test && vp run -r build",
-    "start": "node apps/server/dist/main.mjs"
+    "start": "node apps/server/dist/main.mjs",
+    "pyodide:fetch": "node tools/pyodide/fetch.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
+    "valibot": "catalog:",
     "vite-plus": "catalog:"
   },
   "devEngines": {

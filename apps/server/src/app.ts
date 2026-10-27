@@ -6,7 +6,7 @@ import { WebSocketServer } from "ws";
 import { validateBoundary } from "./boundary.ts";
 import { devWebSocketPath } from "./config.ts";
 import { writeLog, type Logger } from "./log.ts";
-import { isNavigation, serveFile } from "./static.ts";
+import { isNavigation, pyodideCacheControl, serveFile } from "./static.ts";
 
 export type HealthResponse = { status: "ok" };
 export type AppOptions = {
@@ -37,10 +37,11 @@ export const createAppServer = (options: AppOptions = {}): Server => {
     }
     const pyodide = pathname === "/pyodide" || pathname.startsWith("/pyodide/");
     if (pyodide) {
+      const relative = pathname.slice("/pyodide/".length);
       const file =
         options.pyodideRoot === undefined
           ? undefined
-          : await serveFile(context, options.pyodideRoot, pathname.slice("/pyodide/".length));
+          : await serveFile(context, options.pyodideRoot, relative, pyodideCacheControl(relative));
       return file ?? context.json({ error: "not_found" }, 404);
     }
     if (options.webRoot !== undefined) {

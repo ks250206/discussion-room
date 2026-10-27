@@ -26,7 +26,12 @@ const openStaticFile = async (root: string, relative: string) => {
   return { file, size: info.size };
 };
 
-export const serveFile = async (context: Context, root: string, relative: string) => {
+export const serveFile = async (
+  context: Context,
+  root: string,
+  relative: string,
+  cacheControl = "no-cache",
+) => {
   let opened;
   try {
     opened = await openStaticFile(root, relative);
@@ -44,7 +49,7 @@ export const serveFile = async (context: Context, root: string, relative: string
   context.header("Content-Type", getMimeType(relative) ?? "application/octet-stream");
   context.header("Content-Length", String(size));
   context.header("X-Content-Type-Options", "nosniff");
-  context.header("Cache-Control", "no-cache");
+  context.header("Cache-Control", cacheControl);
   if (context.req.method === "HEAD") {
     await file.close();
     return context.body(null, 200);
@@ -52,6 +57,10 @@ export const serveFile = async (context: Context, root: string, relative: string
   // Node's stream closes the descriptor at EOF, on errors, and when the client aborts.
   return context.body(Readable.toWeb(file.createReadStream()));
 };
+
+/** Versioned Pyodide directories never change contents, so browsers may keep them. */
+export const pyodideCacheControl = (relative: string): string =>
+  /^v\d+\.\d+\.\d+\//.test(relative) ? "public, max-age=31536000, immutable" : "no-cache";
 
 export const isNavigation = (pathname: string, accept: string): boolean =>
   extname(pathname) === "" &&
