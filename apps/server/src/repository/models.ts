@@ -15,6 +15,7 @@ import {
   type Project,
 } from "@discussion-room/domain";
 import { equalJson, isLosslessJson, JsonObjectSchema } from "./json.ts";
+import { StoredBlobSchema, type StoredBlob, type BlobRegistration } from "./blob-model.ts";
 
 const text = v.pipe(
   v.string(),
@@ -49,7 +50,7 @@ export const ProjectStateSchema = v.pipe(
   v.strictObject({
     schemaVersion: SchemaVersionSchema,
     graph: GraphSnapshotSchema,
-    blobs: array(OpaqueRecordSchema),
+    blobs: array(v.union([OpaqueRecordSchema, StoredBlobSchema])),
     executionRecords: array(ExecutionRecordSchema),
     provenance: array(ProjectProvenanceSchema),
     snapshots: array(SnapshotRecordSchema),
@@ -175,5 +176,8 @@ export interface Repository {
     afterSeq: unknown,
   ): Result<readonly StoredEvent[], RepositoryError>;
   readAudit(projectId: unknown): Result<readonly StoredAudit[], RepositoryError>;
+  /** Trusted resource registry: no graph mutation or synthetic DomainEvent. */
+  registerBlob(input: unknown): Result<BlobRegistration, RepositoryError>;
+  readBlob(projectId: unknown, sha256: unknown): Result<StoredBlob | null, RepositoryError>;
   close(): void;
 }
