@@ -10,15 +10,23 @@
     "test": "vp test"
   },
   "dependencies": {
+    "@base-ui/react": "catalog:",
     "@discussion-room/domain": "workspace:*",
+    "class-variance-authority": "catalog:",
+    "cn": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "happy-dom": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "valibot": "catalog:",
     "vite": "catalog:",

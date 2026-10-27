@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, lazyPlugins } from "vite-plus";
 // Build-time Node config is shared so the dev proxy and server resolve one target.
@@ -17,7 +19,12 @@ const layout = webConfigLayout(new URL(import.meta.url));
 export default defineConfig(({ command, isPreview }) => {
   const shared = {
     envDir: layout.repoRoot,
-    plugins: lazyPlugins(() => [react()]) ?? [],
+    resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+      },
+    },
+    plugins: lazyPlugins(() => [react(), tailwindcss()]) ?? [],
   };
   if (command !== "serve" || isPreview === true) {
     return shared;
