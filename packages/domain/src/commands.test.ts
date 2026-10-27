@@ -11,6 +11,7 @@ import {
   evolve,
   validate,
   validateDomainState,
+  validateKnownM1State,
   type Command,
   type DecisionContext,
   type DomainState,
@@ -1783,4 +1784,35 @@ describe("review regressions for origin, ownership and independent replay", () =
     expect(beforeState.entities.artifacts).toEqual([beforeArtifact]);
     expect(beforeState.entities.revisions).toEqual([beforeRevision]);
   });
+});
+
+test("known M1 read boundary accepts mixed future content without weakening cache integrity or save rules", () => {
+  const source = fixture();
+  const mixed: DomainState = {
+    ...source,
+    entities: {
+      ...source.entities,
+      artifacts: source.entities.artifacts.map((artifact) =>
+        artifact.id === id(5) ? { ...artifact, kind: "future-table" } : artifact,
+      ),
+    },
+  };
+  const read = validateKnownM1State(mixed);
+  assert(read.ok);
+  expect(read.value).toEqual(mixed);
+  expect(validateDomainState(mixed).ok).toBe(false);
+  const stale: DomainState = {
+    ...mixed,
+    entities: {
+      ...mixed.entities,
+      artifacts: mixed.entities.artifacts.map((artifact) =>
+        artifact.id === id(3) ? { ...artifact, payload: note("stale cache") } : artifact,
+      ),
+    },
+  };
+  expect(validateKnownM1State(stale)).toMatchObject({
+    ok: false,
+    error: { code: "content_integrity_failed" },
+  });
+  expect(source.entities.artifacts.every((artifact) => artifact.kind === "note")).toBe(true);
 });

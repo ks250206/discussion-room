@@ -1,5 +1,5 @@
 import { validateM1ArtifactContent, validateM1RevisionContent } from "./card-content.ts";
-import { M1CardContentSchema, type M1CardContent } from "./card-payloads.ts";
+import { M1CardContentSchema, M1CardKindSchema, type M1CardContent } from "./card-payloads.ts";
 import type { DomainState } from "./commands.ts";
 import type { Artifact, ArtifactRevision } from "./entities.ts";
 import type { EntityReferenceError } from "./entity-snapshot.ts";
@@ -174,11 +174,11 @@ export function validateContentTransition(
   return ok(undefined);
 }
 
-/** Strong M1 boundary used before deciding and after the complete atomic event batch. */
-export function validateDomainState(input: unknown): Result<DomainState, DomainError> {
-  const graph = validateGraphSnapshot(input);
-  if (!graph.ok) return graph;
-  const state = graph.value;
+/** Shared content checks; graph/reference structure has already passed validation. */
+function validateStateContent(
+  state: DomainState,
+  allowFutureKinds: boolean,
+): Result<DomainState, DomainError> {
   const revisions = new Map(state.entities.revisions.map((revision) => [revision.id, revision]));
   const artifacts = new Map(state.entities.artifacts.map((artifact) => [artifact.id, artifact]));
   const revisionsByArtifact = new Map<Id, ArtifactRevision[]>();
@@ -188,6 +188,7 @@ export function validateDomainState(input: unknown): Result<DomainState, DomainE
     else revisionsByArtifact.set(revision.artifactId, [revision]);
   }
   for (const artifact of state.entities.artifacts) {
+    if (allowFutureKinds && !validate(M1CardKindSchema, artifact.kind).ok) continue;
     const valid = validateM1ArtifactContent(artifact);
     if (!valid.ok) return valid;
     const current = revisions.get(artifact.revisionId);
@@ -224,4 +225,19 @@ export function validateDomainState(input: unknown): Result<DomainState, DomainE
     }
   }
   return ok(state);
+}
+
+/** Strong M1 save boundary: future kinds remain unsupported by decide/evolve. */
+export function validateDomainState(input: unknown): Result<DomainState, DomainError> {
+  const graph = validateGraphSnapshot(input);
+  return graph.ok ? validateStateContent(graph.value, false) : graph;
+}
+
+/**
+ * Read/transport boundary preserving future kinds while enforcing every invariant on known M1
+ * artifacts. Unknown content remains opaque and receives no scientific or save certification.
+ */
+export function validateKnownM1State(input: unknown): Result<DomainState, DomainError> {
+  const graph = validateGraphSnapshot(input);
+  return graph.ok ? validateStateContent(graph.value, true) : graph;
 }
