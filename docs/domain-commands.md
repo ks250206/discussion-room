@@ -98,3 +98,7 @@ Event の type は `project.changed / board.changed / artifact.changed / canvasI
 `evolve(state, event) → DomainState` は権威側で検証済みの Event を順に再生する小さな reducer。EventSchema は strict なイベント構造の境界であり、単体で承認や入力 state との整合を証明しない。外部 Event を直接渡して保存許可を得る API ではない。未検証の Command には必ず decide を通し、E4 のイベントログの信頼境界から順に再生する。Event と state は readonly 共有値であり、元の opaque な内部値も呼び出し側が変更せず、新しい値で更新する。
 
 ID の重複検査は現在 state の各コレクションと Revision に対して行う。削除済み ID の Event ログ全体をこの純粋関数は保持せず、ID の再利用を履歴越しには検出できない。E4 の ID 発行/適用境界と E7 の Undo は、削除済み ID を再利用しない永続的な方針を別途保証する必要がある。ULID の偶然の一意性をこの履歴制約の検証済み保証とは扱わない。
+
+## Transport / 読込用の既知 M1 検査
+
+`validateKnownM1State(unknown)` は graph 構造・参照を検証し、全ての既知 M1 Artifact に対して `validateDomainState` と同じ cache / revision 一致、payload 参照、AI 出自・provenance と事前登録の履歴遷移を検査する。未知 kind だけは opaque のまま保持する transport / 読込境界であり、未知内容の科学的検証や保存の認可を与えない。`validateDomainState` / `decide` / `evolve` の M1 保存境界は従来どおり未知 kind を拒否する。JSON 安全性は呼出し側の送受信・保存境界が別途検査する。

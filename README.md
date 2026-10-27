@@ -18,6 +18,8 @@
 | `packages/protocol`  | WebSocket メッセージのスキーマ                       |
 | `packages/materials` | 元素・イオン半径・組成計算                           |
 
+プロトコル package の v1 メッセージ契約・JSON 安全性・サイズ上限は [docs/protocol.md](docs/protocol.md) を参照。`/ws` transport への組み込みは後続 issue。
+
 ## コマンド
 
 ```sh
