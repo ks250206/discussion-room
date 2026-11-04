@@ -1,6 +1,6 @@
 # WebSocket protocol v1 — メッセージ境界
 
-Issue #34。設計の正は implementation-plan.md §0 / §1.2 と ADR-009 / ADR-010。本書は概略を実装可能な契約に具体化する。Room 管理、トランザクション、認証、保持期間、実際の再送・競合解決は実装しない。Presence の間引き、TTL、編集ソフトロックは [presence.md](./presence.md)。
+Issue #34。設計の正は implementation-plan.md §0 / §1.2 と ADR-009 / ADR-010。本書は概略を実装可能な契約に具体化する。サーバーの Room 管理とハンドシェイクは「Room 接続と Presence」を参照。Presence の間引き、TTL、編集ソフトロックは [presence.md](./presence.md)。
 
 ## 利用 API
 
@@ -39,7 +39,7 @@ const outgoing = encodeClientMessage({
 | C→S | presence | `projectId, presence: Presence` |
 | S→C | presence | `projectId, clientId, presence: Presence` |
 | S→C | member | `projectId, action: "joined" | "left", member: Member` |
-| 両方向 | ping / pong | `nonce`（応答で同じ値を返す契約。往復・期限の実装は呼び出し元） |
+| 両方向 | ping / pong | `nonce`（応答で同じ値を返す） |
 
 `Member = {clientId, displayName}`。同一 joined の members に clientId の重複を許さない。
 
@@ -48,6 +48,25 @@ const outgoing = encodeClientMessage({
 `command` は domain の `CommandSchema` をそのまま使い、M1 の content を opaque に置き換えない。概略にある envelope の `baseVersion?` は設けず、更新・削除の domain command 内の必須 `baseVersion` に一本化する。`DecisionContext`、actor、origin、aiApproval などの権威入力を command envelope に追加できない。サーバーが信頼できる経路から context を作り、domain の decide と永続化を行う。wire から AI 提案の承認権限を取得しない。`project.create` は生成前で domain command に ID がないため、envelope の projectId と比較できず、この境界では構造を受理する。Room X に参加したことを別 Project 作成の許可として扱ってはならない。サーバーが Room 内での作成を拒否するか、別途定める lobby / Project 作成経路で生成 ID と接続・認可を管理する必要がある。本 package はその経路を実装しない。
 
 `reject.current` は競合時の **version 診断のみ**。現行 entity / state やロールバックの根拠を提供する契約ではない。#36 / #41 が必要とするなら、現行 entity / state と取得方法を別途明示的に拡張する。診断 message は非空白・2,000 code units 以下。サーバーは秘密情報を含めない責任を持つ。
+
+## Room 接続と Presence
+
+- `/ws` では v1 の JSON テキストを使う。接続は一度だけ `hello` で `clientId` と表示名を登録し、その後 `join` で保存済み Project を選ぶ。同じ接続で同じ Room を `join` し直すと、メンバー通知を重複させず再同期する。別 Room の `join` に成功すると旧 Room を退出する。
+- `clientId` は同時に開くタブやクライアントセッションごとに異なる値を使い、そのセッションの再接続では同じ値を使う。#48 の Web クライアントではタブと Room ごとにランダムな ID を使う。サーバーは先に参加した接続を保持し、同じ ID を名乗る後続の接続には `1013` を返す。ID は認証情報ではなく、他の接続を追い出す権限を与えない。通信断で旧接続が残った場合は、heartbeat で旧接続が外れるまで新しい接続をバックオフ付きで再試行する。
+- 参加する接続には `joined` を最初に送り、続いて Room 内の他のメンバーの有効な Presence を通常の `presence` フレームで送る。生の申請ではなく採用済み snapshot を配信し、申請元にも返す。退出時の `member(action=left)` を受け取ったら、そのメンバーのカーソル、選択、編集ロックを破棄する。接続が残ったまま Presence が失効した場合は、サーバーが空の選択とカーソル・編集項目の省略でクリアを通知する。Presence の送信間引きは [presence.md](./presence.md) に従いクライアント側で行う。サーバー全体の受信レート制限は #45 の範囲。
+- サーバーは既定で 15 秒ごとに `ping` を送り、同じ nonce の `pong` が 10 秒以内に届かなければ接続を終了する。クライアントが送る `ping` にも同じ nonce の `pong` を返す。最後のメンバーが退出したら Room をメモリから破棄する。
+
+| 終了コード | サーバー側の理由 |
+|---|---|
+| `1001` | サーバー停止 |
+| `1002` | JSON、v1 スキーマ、またはプロトコルバージョンが不正 |
+| `1003` | バイナリメッセージ |
+| `1008` | hello なしの join、二度目の hello、存在しない Project、または Room 定員超過 |
+| `1009` | transport の受信上限超過 |
+| `1011` | Project の読み込みまたは joined のエンコード失敗 |
+| `1013` | 同じ Room に同じ clientId が参加中。再試行可 |
+
+heartbeat のタイムアウトや送信バッファ上限ではサーバーが接続を強制終了する。クライアントは通常、異常切断を示す `1006` を受け取る。
 
 ## seq、snapshot、resume
 

@@ -93,7 +93,7 @@ item の実在、その board への所属、selection の所属は見ない。R
 - `releaseClient` は対象の record を先に除き、残りの期限切れを落とす。対象が既にいなくても成功する。残りに同じ組の生きている保持者が二人いるときは修復せず `invalid_records` を返す。
 - 再送、flush、`expirePresence` のタイマーは呼び出し側が持つ。
 - サーバーが配る S→C presence は、`applyPresence` が返した snapshot である。`denied` の生要求を配ると、取っていないロックが見える。
-- 永続化しない。SQLite、event log、snapshot に Presence を載せない。再接続で presence は戻らない。
+- 永続化しない。SQLite、event log、snapshot に Presence を載せない。退出した接続の Presence は復元しない。join した接続には Room 内の他のメンバーの有効な Presence を `joined` の後に配信する。クライアントは `member(action=left)` で対象メンバーの Presence を破棄する。
 - 正常な遷移は二つの生きている保持者を作らない。入力が既にその状態なら、期限で片方が落ちる場合を除き、勝者を選ばず `invalid_records` にする。
 
 `invalid_records` は clientId の重複、schema に合わない record、上限超過、生きている二重ロックである。切断処理は対象 client を除いたあとで残りの二重ロックを見るので、壊れた相手を黙って片方にしない。

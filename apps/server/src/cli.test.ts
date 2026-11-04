@@ -121,7 +121,11 @@ test.each(["SIGTERM", "SIGINT"] as const)(
       expect(app.output()).toContain(join(root, "CLI data"));
       expect(app.errors()).toBe("");
       expect(await readFile(envFile, "utf8")).toBe(envContent);
-      await expect(readFile(join(root, "CLI data"))).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        (await readFile(join(root, "CLI data", "discussion-room.sqlite")))
+          .subarray(0, 16)
+          .toString(),
+      ).toBe("SQLite format 3\0");
     } finally {
       await stop(app.child);
       await rm(root, { recursive: true, force: true });

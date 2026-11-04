@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createAppServer } from "./app.ts";
 import {
@@ -10,6 +10,7 @@ import {
   serverEntryLayout,
 } from "./config.ts";
 import { writeLog } from "./log.ts";
+import { openSqliteRepository } from "./repository/index.ts";
 
 const layout = serverEntryLayout(new URL(import.meta.url));
 try {
@@ -41,7 +42,20 @@ if (!development && !existsSync(join(paths.webRoot, "index.html"))) {
   });
   process.exit(1);
 }
-const server = createAppServer({ development, ...paths });
+const { host, port, dataDir } = loaded.value;
+try {
+  mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+} catch (error) {
+  writeLog({ level: "error", event: "startup_error", message: String(error) });
+  process.exit(1);
+}
+const opened = openSqliteRepository(join(dataDir, "discussion-room.sqlite"));
+if (!opened.ok) {
+  writeLog({ level: "error", event: "startup_error", message: opened.error.code, dataDir });
+  process.exit(1);
+}
+const repository = opened.value;
+const server = createAppServer({ development, ...paths, repository });
 let stopping = false;
 let hasListened = false;
 const shutdown = (reason: string): void => {
@@ -49,6 +63,7 @@ const shutdown = (reason: string): void => {
   stopping = true;
   writeLog({ level: "info", event: "shutdown_started", reason });
   server.close((error) => {
+    repository.close();
     if (error !== undefined) {
       writeLog({ level: "error", event: "shutdown_failed", message: error.message });
       process.exitCode = 1;
@@ -71,7 +86,6 @@ server.on("error", (error: Error) => {
   shutdown("server_error");
 });
 
-const { host, port, dataDir } = loaded.value;
 server.listen(port, host, () => {
   hasListened = true;
   const url = devProxyTarget({ host, port }).http;
@@ -81,7 +95,6 @@ server.listen(port, host, () => {
     url,
     message: `discussion-room server listening on ${url}`,
     dataDir,
-    dataDirStatus: "reserved_not_created",
     mode: development ? "development" : "production",
   });
 });

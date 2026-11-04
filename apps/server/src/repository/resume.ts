@@ -1,4 +1,4 @@
-import { ok, type Result } from "@discussion-room/domain";
+import { ok, type DomainState, type Result } from "@discussion-room/domain";
 import {
   PROTOCOL_LIMITS,
   encodeServerMessage,
@@ -23,12 +23,12 @@ function wireEvent(event: StoredEvent) {
 }
 
 /** Encode a join reply at the sequence of one atomic repository read. */
-export function encodeJoinReply(
+export function readJoinReply(
   repository: Repository,
   join: JoinMessage,
   members: readonly Member[],
   nowMs = Date.now(),
-): Result<string | null, RepositoryError | ProtocolError> {
+): Result<{ wire: string; graph: DomainState } | null, RepositoryError | ProtocolError> {
   const { projectId, lastSeq } = join;
   const read = repository.readProjectForResume(
     projectId,
@@ -50,8 +50,19 @@ export function encodeJoinReply(
       fromSeq: lastSeq,
       events: events.map(wireEvent),
     });
-    if (replay.ok) return replay;
+    if (replay.ok) return ok({ wire: replay.value, graph: state.graph });
   }
 
-  return encodeServerMessage({ ...header, mode: "snapshot", snapshot: state.graph });
+  const snapshot = encodeServerMessage({ ...header, mode: "snapshot", snapshot: state.graph });
+  return snapshot.ok ? ok({ wire: snapshot.value, graph: state.graph }) : snapshot;
+}
+
+export function encodeJoinReply(
+  repository: Repository,
+  join: JoinMessage,
+  members: readonly Member[],
+  nowMs = Date.now(),
+): Result<string | null, RepositoryError | ProtocolError> {
+  const reply = readJoinReply(repository, join, members, nowMs);
+  return reply.ok ? ok(reply.value?.wire ?? null) : reply;
 }
