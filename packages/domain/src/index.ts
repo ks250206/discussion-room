@@ -150,5 +150,6 @@ export {
   validateDomainState,
   validateKnownM1State,
   type CommandError,
+  type ConflictCurrent,
   type DomainError,
 } from "./domain-state.ts";
