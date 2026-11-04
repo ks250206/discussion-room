@@ -8,10 +8,12 @@ import {
   type DomainState,
   type Event,
 } from "./commands.ts";
+import { rebaseUpdate } from "./conflict-policy.ts";
 import {
   equalContent,
   validateDomainState,
   type CommandError,
+  type ConflictCurrent,
   type DomainError,
 } from "./domain-state.ts";
 import type { ArtifactRevision } from "./entities.ts";
@@ -19,7 +21,7 @@ import type { Id } from "./id.ts";
 import { err, ok, type Result } from "./result.ts";
 import { validate } from "./validation.ts";
 
-/** Conservative E2 hook; E3 adds LWW/field merge policy without bypassing integrity checks. */
+/** Exact version check, also used by deletes and by callers without committed history. */
 export function checkBaseVersion(
   current: { readonly id: Id; readonly version: number },
   baseVersion: number,
@@ -35,15 +37,21 @@ export function checkBaseVersion(
       });
 }
 
-function target<T extends { readonly id: Id; readonly version: number }>(
+function target<T extends NonNullable<Event["after"]>>(
   rows: readonly T[],
   command: { readonly id: Id; readonly baseVersion: number },
+  ports?: ConflictCurrent["ports"],
 ): Result<T, CommandError> {
   const current = rows.find((row) => row.id === command.id);
   if (!current)
     return err({ code: "not_found", message: "Command target does not exist", id: command.id });
   const version = checkBaseVersion(current, command.baseVersion);
-  return version.ok ? ok(current) : version;
+  return version.ok
+    ? ok(current)
+    : err({
+        ...version.error,
+        current: { entity: current, ...(ports === undefined ? {} : { ports }) },
+      });
 }
 
 function replace<T extends { readonly id: Id }>(
@@ -350,7 +358,8 @@ function buildEvents(
       break;
     case "canvasItem.update":
     case "canvasItem.delete": {
-      const current = target(state.entities.canvasItems, command);
+      const ports = state.itemPorts.find((declaration) => declaration.itemId === command.id);
+      const current = target(state.entities.canvasItems, command, ports);
       if (!current.ok) return current;
       const before = current.value;
       const itemEvent: Event = {
@@ -361,8 +370,7 @@ function buildEvents(
           command.type === "canvasItem.delete"
             ? null
             : { ...before, ...command.value, version: before.version + 1 },
-        portsBefore:
-          state.itemPorts.find((declaration) => declaration.itemId === before.id) ?? null,
+        portsBefore: ports ?? null,
         portsAfter:
           command.type === "canvasItem.delete" ? null : { itemId: before.id, ports: command.ports },
       };
@@ -478,11 +486,15 @@ function buildEvents(
   return ok(events);
 }
 
-/** Validate all boundary inputs, decide atomically, and return only authoritative replayable events. */
+/**
+ * Validate state, command and context, then decide atomically.
+ * committedHistory is a trusted, ordered suffix of the authority's validated Event log.
+ */
 export function decide(
   input: unknown,
   commandInput: unknown,
   contextInput: unknown,
+  committedHistory?: readonly Event[],
 ): Result<readonly Event[], DomainError> {
   const state = validateDomainState(input);
   if (!state.ok) return state;
@@ -490,7 +502,18 @@ export function decide(
   if (!command.ok) return command;
   const ctx = validate(DecisionContextSchema, contextInput);
   if (!ctx.ok) return ctx;
-  const decision = buildEvents(state.value, command.value, ctx.value);
+  let decision = buildEvents(state.value, command.value, ctx.value);
+  if (
+    !decision.ok &&
+    decision.error.code === "version_conflict" &&
+    committedHistory !== undefined
+  ) {
+    const rebased = rebaseUpdate(command.value, decision.error, committedHistory);
+    if (!rebased.ok) return rebased;
+    const replacement = validate(CommandSchema, rebased.value);
+    if (!replacement.ok) return replacement;
+    decision = buildEvents(state.value, replacement.value, ctx.value);
+  }
   if (!decision.ok) return decision;
   let next = state.value;
   for (const event of decision.value) {

@@ -1816,3 +1816,383 @@ test("known M1 read boundary accepts mixed future content without weakening cach
   });
   expect(source.entities.artifacts.every((artifact) => artifact.kind === "note")).toBe(true);
 });
+
+function concurrentCanvasUpdate(
+  baseVersion: number,
+  x: number,
+  width = 200,
+  viewState = { nested: { preserve: true } },
+): Extract<Command, { type: "canvasItem.update" }> {
+  return {
+    type: "canvasItem.update",
+    id: id(9),
+    baseVersion,
+    value: { x, y: 0, width, height: 100, viewState },
+    ports: [
+      { name: "in", direction: "input", type: "number" },
+      { name: "out", direction: "output", type: "number" },
+    ],
+  };
+}
+
+describe("concurrent updates", () => {
+  test("merges disjoint content, rejects overlap and tracks intervening changes that were reverted", () => {
+    const initial = fixture();
+    const update = (baseVersion: number, title: string, markdown: string): Command => ({
+      type: "artifact.update",
+      id: id(3),
+      baseVersion,
+      content: { kind: "note", payload: { ...note(markdown), title } },
+    });
+    const first = decide(initial, update(1, "first", "recorded"), context());
+    assert(first.ok);
+    const current = first.value.reduce(evolve, initial);
+    const second = decide(
+      current,
+      update(1, "note", "second"),
+      context({ revisionId: id(22) }),
+      first.value,
+    );
+    assert(second.ok);
+    const merged = second.value.reduce(evolve, current);
+    expect(merged.entities.artifacts.find((row) => row.id === id(3))).toMatchObject({
+      version: 3,
+      payload: { title: "first", markdown: "second" },
+    });
+    const revert = decide(merged, update(3, "note", "second"), context({ revisionId: id(23) }));
+    assert(revert.ok);
+    const reverted = revert.value.reduce(evolve, merged);
+    const rejected = decide(
+      reverted,
+      update(1, "overlap", "recorded"),
+      context({ revisionId: id(24) }),
+      [...first.value, ...second.value, ...revert.value],
+    );
+    expect(rejected).toMatchObject({
+      ok: false,
+      error: { code: "version_conflict", field: "title", current: { entity: { version: 4 } } },
+    });
+    const missingBase = decide(
+      reverted,
+      update(1, "note", "new"),
+      context({ revisionId: id(24) }),
+      revert.value,
+    );
+    expect(missingBase).toMatchObject({
+      ok: false,
+      error: { code: "version_conflict", currentVersion: 4 },
+    });
+  });
+
+  test("uses server order for edited geometry, preserves untouched fields, and never revives deleted items", () => {
+    const initial = fixture();
+    const first = decide(
+      initial,
+      concurrentCanvasUpdate(1, 10, 400, { nested: { preserve: false } }),
+      context(),
+    );
+    assert(first.ok);
+    const current = first.value.reduce(evolve, initial);
+    const second = decide(current, concurrentCanvasUpdate(1, 20), context(), first.value);
+    assert(second.ok);
+    const moved = second.value.reduce(evolve, current);
+    expect(moved.entities.canvasItems.find((row) => row.id === id(9))).toMatchObject({
+      version: 3,
+      x: 20,
+      width: 400,
+      viewState: { nested: { preserve: false } },
+    });
+    const deleted = decide(
+      moved,
+      { type: "canvasItem.delete", id: id(9), baseVersion: 3 },
+      context(),
+    );
+    assert(deleted.ok);
+    expect(
+      decide(
+        deleted.value.reduce(evolve, moved),
+        concurrentCanvasUpdate(3, 50),
+        context(),
+        deleted.value,
+      ),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "not_found", id: id(9) },
+    });
+  });
+
+  test("returns the current prediction if a stale draft would change a newly registered payload", () => {
+    const initial = stateWithContent("hypothesis", hypothesis());
+    const draft = prediction();
+    const created = apply(initial, {
+      type: "artifact.create",
+      projectId: id(1),
+      content: { kind: "prediction", payload: draft },
+    });
+    const registration = {
+      status: "registered",
+      registeredAt: later,
+      registeredBy: "editor",
+      rules: [
+        {
+          outcome: "increase",
+          supportsHypothesisIds: [id(3)],
+          challengesHypothesisIds: [],
+          rationale: "discriminates",
+        },
+      ],
+    };
+    const update = (payload: unknown) => ({
+      type: "artifact.update",
+      id: id(20),
+      baseVersion: 1,
+      content: { kind: "prediction", payload },
+    });
+    const registered = decide(
+      created.state,
+      update({ ...draft, registration }),
+      context({ revisionId: id(22) }),
+    );
+    assert(registered.ok);
+    const current = registered.value.reduce(evolve, created.state);
+    expect(
+      decide(
+        current,
+        update({ ...draft, title: "stale title" }),
+        context({ revisionId: id(23) }),
+        registered.value,
+      ),
+    ).toMatchObject({
+      ok: false,
+      error: {
+        code: "version_conflict",
+        field: "registration",
+        current: { entity: { version: 2, payload: { registration } } },
+      },
+    });
+  });
+
+  test("randomized clients converge under independent field and rollback checks", () => {
+    const coverage = {
+      geometry: 0,
+      mergedArtifact: 0,
+      overlapping: 0,
+      missing: 0,
+      batch: 0,
+      rollback: 0,
+      preservedDraft: 0,
+    };
+    for (let seed = 1; seed <= 24; seed += 1) {
+      let randomState = seed;
+      const pick = (size: number): number => {
+        randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+        return (randomState >>> 8) % size;
+      };
+      const itemId = id(7);
+      const artifactId = id(3);
+      const initial = fixture();
+      const history: Event[] = [];
+      let authority = initial;
+
+      function inspect(state: DomainState) {
+        const item = state.entities.canvasItems.find((row) => row.id === itemId);
+        const artifact = state.entities.artifacts.find((row) => row.id === artifactId);
+        assert(artifact);
+        return {
+          item: item === undefined ? null : { version: item.version, x: item.x, width: item.width },
+          note: {
+            version: artifact.version,
+            title: artifact.payload.title,
+            markdown: artifact.payload.markdown,
+          },
+        };
+      }
+
+      let expected = inspect(initial);
+      const lastNoteEdit = { title: 1, markdown: 1 };
+      type Edit =
+        | { field: "title"; value: string }
+        | { field: "markdown"; value: string }
+        | { field: "x"; value: number }
+        | { field: "width"; value: number }
+        | { field: "delete" };
+      type Pending = { edit: Edit; lastSeq?: number };
+      const clients = Array.from({ length: 3 }, () => ({
+        cursor: 0,
+        confirmed: initial,
+        visible: inspect(initial),
+        pending: new Map<Id, Pending>(),
+      }));
+      type Client = (typeof clients)[number];
+
+      function rebuild(client: Client): void {
+        const visible = inspect(client.confirmed);
+        for (const { edit } of client.pending.values()) {
+          if (edit.field === "title" || edit.field === "markdown") {
+            visible.note[edit.field] = edit.value;
+          } else if (edit.field === "delete") {
+            visible.item = null;
+          } else if (visible.item !== null) {
+            visible.item[edit.field] = edit.value;
+          }
+        }
+        client.visible = visible;
+      }
+
+      function deliver(client: Client, stop: number): void {
+        client.confirmed = history.slice(client.cursor, stop).reduce(evolve, client.confirmed);
+        client.cursor = stop;
+        for (const [key, pending] of client.pending) {
+          if (pending.lastSeq !== undefined && pending.lastSeq <= stop) client.pending.delete(key);
+        }
+        rebuild(client);
+      }
+
+      for (let round = 1; round <= 12; round += 1) {
+        const queue = clients.flatMap((client, index) => {
+          if (pick(2) === 0) deliver(client, history.length);
+          const confirmed = inspect(client.confirmed);
+          const action = pick(8);
+          const number = 1000 + round * 3 + index;
+          const ctx = context({ commandId: id(number), revisionId: id(number + 100) });
+          let command: Extract<
+            Command,
+            { type: "artifact.update" | "canvasItem.update" | "canvasItem.delete" }
+          >;
+          let edit: Edit;
+          if (action < 4 || confirmed.item === null) {
+            const artifact = client.confirmed.entities.artifacts.find(
+              (row) => row.id === artifactId,
+            );
+            assert(artifact);
+            const payload = validate(CommandSchema, {
+              type: "artifact.update",
+              id: artifactId,
+              baseVersion: artifact.version,
+              content: { kind: "note", payload: artifact.payload },
+            });
+            assert(
+              payload.ok &&
+                payload.value.type === "artifact.update" &&
+                payload.value.content.kind === "note",
+            );
+            const field = action % 2 === 0 ? "title" : "markdown";
+            const value = `edit-${number}`;
+            edit = { field, value };
+            command = {
+              ...payload.value,
+              content: {
+                kind: "note",
+                payload: { ...payload.value.content.payload, [field]: value },
+              },
+            };
+          } else if (action === 7 && round > 8) {
+            command = {
+              type: "canvasItem.delete",
+              id: itemId,
+              baseVersion: confirmed.item.version,
+            };
+            edit = { field: "delete" };
+          } else {
+            const item = client.confirmed.entities.canvasItems.find((row) => row.id === itemId);
+            const ports = client.confirmed.itemPorts.find((row) => row.itemId === itemId);
+            assert(item && ports);
+            const field = action % 2 === 0 ? "x" : "width";
+            edit = { field, value: number };
+            command = {
+              type: "canvasItem.update",
+              id: itemId,
+              baseVersion: item.version,
+              value: {
+                x: item.x,
+                y: item.y,
+                width: item.width,
+                height: item.height,
+                viewState: item.viewState,
+                [field]: number,
+              },
+              ports: ports.ports,
+            };
+          }
+          client.pending.set(ctx.commandId, { edit });
+          rebuild(client);
+          return [{ client, command, ctx, edit }];
+        });
+
+        while (queue.length > 0) {
+          const [entry] = queue.splice(pick(queue.length), 1);
+          assert(entry);
+          const { client, command, ctx, edit } = entry;
+          const decision = decide(authority, command, ctx, history);
+          const baseVersion = command.baseVersion;
+          let error: "version_conflict" | "not_found" | undefined;
+          // Independent oracle: per-field write versions and an arrival-ordered geometry model.
+          if (edit.field === "title" || edit.field === "markdown") {
+            if (lastNoteEdit[edit.field] > baseVersion) {
+              coverage.overlapping += 1;
+              error = "version_conflict";
+            } else {
+              if (expected.note.version > baseVersion) coverage.mergedArtifact += 1;
+              expected.note[edit.field] = edit.value;
+              expected.note.version += 1;
+              lastNoteEdit[edit.field] = expected.note.version;
+            }
+          } else if (expected.item === null) {
+            coverage.missing += 1;
+            error = "not_found";
+          } else if (edit.field === "delete") {
+            if (expected.item.version === baseVersion) expected = { ...expected, item: null };
+            else error = "version_conflict";
+          } else {
+            if (expected.item.version > baseVersion) coverage.geometry += 1;
+            expected.item[edit.field] = edit.value;
+            expected.item.version += 1;
+          }
+          expect(decision.ok ? undefined : decision.error.code).toBe(error);
+          if (decision.ok) {
+            history.push(...decision.value);
+            authority = decision.value.reduce(evolve, authority);
+            client.pending.set(ctx.commandId, { edit, lastSeq: history.length });
+            if (decision.value.length > 1) {
+              coverage.batch += 1;
+              deliver(client, history.length - 1);
+              assert(client.pending.has(ctx.commandId) && client.visible.item === null);
+              deliver(client, history.length);
+              assert(!client.pending.has(ctx.commandId));
+            }
+          } else {
+            client.pending.delete(ctx.commandId);
+            rebuild(client);
+            if (edit.field === "title" || edit.field === "markdown") {
+              coverage.rollback += 1;
+              assert(client.visible.note[edit.field] !== edit.value);
+              const other = edit.field === "title" ? "markdown" : "title";
+              const latestOtherDraft = [...client.pending.values()].findLast(
+                (pending) => pending.edit.field === other,
+              );
+              const preserved = latestOtherDraft?.edit;
+              if (preserved !== undefined) coverage.preservedDraft += 1;
+              const otherValue =
+                preserved?.field === other
+                  ? preserved.value
+                  : inspect(client.confirmed).note[other];
+              assert(client.visible.note[other] === otherValue);
+            }
+          }
+          expect(inspect(authority)).toEqual(expected);
+        }
+        for (const client of clients) {
+          const stop = client.cursor + pick(history.length - client.cursor + 1);
+          deliver(client, stop);
+        }
+      }
+      for (const client of clients) {
+        deliver(client, history.length);
+        expect(client.pending.size).toBe(0);
+        expect(client.visible).toEqual(expected);
+        expect(client.confirmed).toEqual(authority);
+      }
+    }
+    for (const count of Object.values(coverage)) expect(count).toBeGreaterThan(0);
+  });
+});
