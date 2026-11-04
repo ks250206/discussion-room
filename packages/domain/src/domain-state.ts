@@ -1,6 +1,6 @@
 import { validateM1ArtifactContent, validateM1RevisionContent } from "./card-content.ts";
 import { M1CardContentSchema, M1CardKindSchema, type M1CardContent } from "./card-payloads.ts";
-import type { DomainState } from "./commands.ts";
+import type { DomainState, Event } from "./commands.ts";
 import type { Artifact, ArtifactRevision } from "./entities.ts";
 import type { EntityReferenceError } from "./entity-snapshot.ts";
 import { validateGraphSnapshot, type GraphReferenceError } from "./graph-validation.ts";
@@ -8,6 +8,11 @@ import type { Id } from "./id.ts";
 import { compareTimestamps, type ChronologyError } from "./timestamp-order.ts";
 import { err, ok, type Result } from "./result.ts";
 import { validate, type ValidationError } from "./validation.ts";
+
+export type ConflictCurrent = {
+  readonly entity: NonNullable<Event["after"]>;
+  readonly ports?: NonNullable<Extract<Event, { type: "canvasItem.changed" }>["portsAfter"]>;
+};
 
 export type CommandError = {
   readonly code:
@@ -27,6 +32,7 @@ export type CommandError = {
   readonly field?: string;
   readonly referenceId?: Id;
   readonly currentVersion?: number;
+  readonly current?: ConflictCurrent;
   readonly baseVersion?: number;
 };
 export type DomainError =

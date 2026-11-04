@@ -44,9 +44,26 @@ if (decision.ok) {
 
 ## version と競合
 
-update / delete は現在 version と `baseVersion` の完全一致を要求し、更新は version を 1 増やす。safe integer を超える場合もイベントを返さない。`version_conflict` は `id, currentVersion, baseVersion` を持つ。`checkBaseVersion(current, baseVersion)` を独立した純粋なフックとして公開する。
+更新は version を 1 増やす。safe integer を超える場合もイベントを返さない。削除、未来の `baseVersion`、および履歴を渡さない既存の 3 引数の `decide` は、現在 version と `baseVersion` の完全一致を要求する。対象が既に削除されていれば `not_found` を返し、復活させない。
 
-E2 のこの関数は保守的な一致検査である。[ADR-009](./decisions/009-command-event-sync.md) の位置・サイズ LWW、本文のフィールドマージ、Presence ソフトロックは E3.3 (#36) でポリシーを追加する。ここで位置にも一致を求めることを最終同期ポリシーと解釈しない。
+### 並行更新 (#36)
+
+Room の権威側は `decide(state, command, ctx, committedHistory)` に、同じ Room のコミット済み Event を昇順で渡す。履歴は Command やクライアントの入力から作らず、渡した state と同じトランザクション境界から取得する。対象の更新 Event を現在 version から逆にたどり、`baseVersion` に到達できなければ `version_conflict` を返す。過去の ID を再利用しない条件は引き続き必要。
+
+- 送信された置換値を base と比較し、実際に差があるフィールドだけを編集とみなす。フィールドは各 `value`、Artifact の `content.payload` の直下、および CanvasItem の `ports`。配列や入れ子の値はひとまとまりとする。線の metadata の省略は保持、Artifact payload の任意フィールドの省略は削除を表す。
+- CanvasItem の `x`、`y`、`width`、`height` の編集は各フィールドでサーバー適用順の LWW とする。送信された値が base と同じ項目は現在値を保持する。
+- ほかの編集対象フィールドを base 以降に変更していれば、同じ値に戻っている場合も競合とする。それ以外は現在値へ合成し、通常のスキーマ、参照、内容、承認の検証を通す。AI 内容の古い更新は新しい差分の確認を要求するため、古い承認から合成しない。登録済みとして送られた予測は、途中に内容変更があれば拒否する。base 以降に登録された予測へ古い下書きの編集を合成すると登録時の内容が変わる場合も、競合として返す。
+- ドメインの `version_conflict` は `id`、`currentVersion`、`baseVersion`、権威側の `current.entity` と CanvasItem の `current.ports`（存在する場合）を持つ。衝突したフィールドを特定できたときは `field` も返す。独立した `checkBaseVersion` は従来どおり version のみを比較する。
+
+### 楽観表示の巻き戻し
+
+クライアントは確定 state と確定 seq、`commandId` ごとの未確定編集を別に保持する。画面は確定 state に適用可能な未確定編集を送信順に重ねて描画する。Command は編集の根拠となった確定 version を保持し、送信済み Command の `baseVersion` をローカルで書き換えない。
+
+1. `event` は seq 順に確定 state に適用する。複数 Event を持つ Command は、確定を示す `ack.seq` まで追いついた段階で対応する未確定編集を外す。ACK が先着しても、確定 Event が届くまで確定 state は進めない。
+2. `reject` を受けたらその `commandId` の未確定編集だけを外し、確定 state と残る編集から画面を再構成する。逆 Event や過去の画面 state を現在の確定 state に適用すると、後から届いた他者の変更を消してしまう。
+3. v1 の wire `reject.current` は version 診断を返す。診断の版に未到達であれば、確定 cursor 以降の Event の再送またはスナップショットを要求する。スナップショットが必要な場合も、保留中の編集は再検証し、適用できない編集を手動解決用のドラフトとして扱う。
+
+Presence のソフトロックは #37 が定義する。Room と永続化への接続は #41、クライアント同期ストアへの組み込みは #48 が担当する。
 
 ## 著者付き Revision と内容の整合
 
