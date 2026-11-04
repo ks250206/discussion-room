@@ -159,14 +159,16 @@ test("Vite proxies only /api paths and exact /ws, preserving query strings", asy
         socket.once("open", () => resolve());
         socket.once("error", () => reject(new Error(`websocket failed: ${wsUrl.href}`)));
       });
-      const echoed = new Promise<{ data: RawData; isBinary: boolean }>((resolve) => {
+      const reply = new Promise<{ data: RawData; isBinary: boolean }>((resolve) => {
         socket.once("message", (data, isBinary) => resolve({ data, isBinary }));
       });
-      const payload = Buffer.from([9, 8, 7]);
-      socket.send(payload);
-      const message = await echoed;
-      expect(message.isBinary).toBe(true);
-      expect(Buffer.compare(asBuffer(message.data), payload)).toBe(0);
+      socket.send(JSON.stringify({ type: "ping", nonce: "proxy-probe" }));
+      const message = await reply;
+      expect(message.isBinary).toBe(false);
+      expect(JSON.parse(asBuffer(message.data).toString("utf8"))).toEqual({
+        type: "pong",
+        nonce: "proxy-probe",
+      });
     } finally {
       socket.close();
     }

@@ -89,23 +89,20 @@ const closeSocket = (socket: WebSocket): Promise<void> =>
     socket.close();
   });
 
-test("echoes text and binary frames on /ws, including a query string", async () => {
+test("responds to protocol ping and rejects binary frames on /ws with a query string", async () => {
   const socket = await openSocket(`${baseUrl.replace(/^http/, "ws")}${devWebSocketPath}?probe=1`);
   try {
     const text = new Promise<RawData>((resolve) => {
-      socket.once("message", (data) => resolve(data));
+      socket.once("message", resolve);
     });
-    socket.send("hello");
-    expect(asBuffer(await text).toString("utf8")).toBe("hello");
-
-    const binary = new Promise<{ data: RawData; isBinary: boolean }>((resolve) => {
-      socket.once("message", (data, isBinary) => resolve({ data, isBinary }));
+    socket.send(JSON.stringify({ type: "ping", nonce: "probe" }));
+    expect(JSON.parse(asBuffer(await text).toString("utf8"))).toEqual({
+      type: "pong",
+      nonce: "probe",
     });
-    const payload = Buffer.from([0, 1, 2, 255]);
-    socket.send(payload);
-    const echoed = await binary;
-    expect(echoed.isBinary).toBe(true);
-    expect(Buffer.compare(asBuffer(echoed.data), payload)).toBe(0);
+    const closed = new Promise<number>((resolve) => socket.once("close", resolve));
+    socket.send(Buffer.from([0, 1, 2, 255]));
+    expect(await closed).toBe(1003);
   } finally {
     await closeSocket(socket);
   }

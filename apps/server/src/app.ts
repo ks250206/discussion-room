@@ -2,14 +2,16 @@ import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { getRequestListener } from "@hono/node-server";
 import { Hono } from "hono";
+import { PROTOCOL_LIMITS } from "@discussion-room/protocol";
 import { WebSocketServer } from "ws";
 import { validateBoundary } from "./boundary.ts";
 import { devWebSocketPath } from "./config.ts";
 import { writeLog, type Logger } from "./log.ts";
+import { createRoomManager, type RoomManagerOptions } from "./room-manager.ts";
 import { isNavigation, pyodideCacheControl, serveFile } from "./static.ts";
 
 export type HealthResponse = { status: "ok" };
-export type AppOptions = {
+export type AppOptions = Omit<RoomManagerOptions, "logger"> & {
   development?: boolean;
   webRoot?: string;
   pyodideRoot?: string;
@@ -95,7 +97,11 @@ export const createAppServer = (options: AppOptions = {}): Server => {
     connections.add(socket);
     socket.once("close", () => connections.delete(socket));
   });
-  const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+  const rooms = createRoomManager({ ...options, logger });
+  const sockets = new WebSocketServer({
+    noServer: true,
+    maxPayload: PROTOCOL_LIMITS.maxMessageBytes,
+  });
   server.on("upgrade", (request, socket, head) => {
     const onError = (error: Error): void => {
       logger({ level: "error", event: "upgrade_error", message: error.message });
@@ -122,10 +128,7 @@ export const createAppServer = (options: AppOptions = {}): Server => {
     socket.on("error", (error: Error) =>
       logger({ level: "error", event: "websocket_error", message: error.message }),
     );
-    socket.on("message", (data, binary) => {
-      // Transport probe only; Room messages and persistence are later issues.
-      socket.send(Array.isArray(data) ? Buffer.concat(data) : data, { binary });
-    });
+    rooms.connect(socket);
   });
   sockets.on("error", (error: Error) =>
     logger({ level: "error", event: "websocket_server_error", message: error.message }),
@@ -136,6 +139,7 @@ export const createAppServer = (options: AppOptions = {}): Server => {
   server.close = (callback) => {
     closed ??= new Promise((resolve) => {
       closing = true;
+      rooms.stop();
       const timeout = setTimeout(() => {
         for (const client of sockets.clients) client.terminate();
         server.closeAllConnections();

@@ -51,12 +51,21 @@ test("node --watch restarts the server when an imported source file changes", as
     });
     await writeFile(join(serverRoot, "package.json"), '{ "type": "module" }\n');
     await mkdir(join(serverRoot, "node_modules"));
-    for (const name of ["ws", "hono", "@hono/node-server", "valibot"]) {
+    for (const name of [
+      "ws",
+      "hono",
+      "@hono/node-server",
+      "@discussion-room/domain",
+      "@discussion-room/protocol",
+      "valibot",
+    ]) {
       const target = await realpath(
         fileURLToPath(new URL(`../node_modules/${name}`, import.meta.url)),
       );
       if (name.startsWith("@"))
-        await mkdir(join(serverRoot, "node_modules", "@hono"), { recursive: true });
+        await mkdir(join(serverRoot, "node_modules", name.split("/")[0] ?? ""), {
+          recursive: true,
+        });
       await symlink(target, join(serverRoot, "node_modules", name));
     }
 
