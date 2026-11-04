@@ -1,3 +1,5 @@
+import { IdSchema, validate } from "@discussion-room/domain";
+import { ProjectConnection } from "../sync-status/ProjectConnection.tsx";
 import { Dialog } from "@base-ui/react/dialog";
 import { useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "../components/ui/button.tsx";
@@ -164,6 +166,9 @@ export const AppShell = ({ status }: AppShellProps) => {
   const labels = resolveShellStatus(status);
   const route = parseRoute(pathname);
   const title = routeTitle(route);
+  const candidate =
+    route.kind === "project" || route.kind === "board" ? validate(IdSchema, route.projectId) : null;
+  const projectId = candidate?.ok === true ? candidate.value : null;
 
   return (
     <>
@@ -208,6 +213,7 @@ export const AppShell = ({ status }: AppShellProps) => {
           ))}
         </nav>
         <main id="main" tabIndex={-1} className="app-shell__main" aria-labelledby="page-title">
+          {projectId === null ? null : <ProjectConnection key={projectId} projectId={projectId} />}
           <RouteView route={route} pathname={pathname} onNavigate={pathStore.push} />
           <section className="app-shell__canvas" aria-label="キャンバス">
             <p>キャンバスはまだありません</p>
@@ -226,10 +232,12 @@ export const AppShell = ({ status }: AppShellProps) => {
           </aside>
         )}
         <footer className="app-shell__status">
-          <span className="app-shell__status-item">
-            <span className="app-shell__status-label">接続</span>
-            <span className="app-shell__status-value">{labels.connection}</span>
-          </span>
+          {projectId === null ? (
+            <span className="app-shell__status-item">
+              <span className="app-shell__status-label">接続</span>
+              <span className="app-shell__status-value">{labels.connection}</span>
+            </span>
+          ) : null}
           <span className="app-shell__status-item">
             <span className="app-shell__status-label">保存</span>
             <span className="app-shell__status-value">{labels.save}</span>
