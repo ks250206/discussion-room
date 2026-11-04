@@ -9,3 +9,4 @@ export {
   type JsonObject,
   type BoundaryError,
 } from "./json.ts";
+export * from "./sync-client.ts";
