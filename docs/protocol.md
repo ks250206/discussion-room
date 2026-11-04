@@ -58,9 +58,9 @@ const outgoing = encodeClientMessage({
 - snapshot には指定 Project がちょうど一つ必要。boards / artifacts の projectId と graph 参照を検証し、全 snapshot に domain の `validateKnownM1State` を適用する。未知の将来 kind を含む場合も、graph 参照と既知 M1 Artifact の cache / revision 一致、payload 参照、AI 出自・事前登録を含む履歴遷移の全検査を維持する。未知 payload は JSON 安全な opaque data として保持する。これは将来 kind の科学的妥当性や M1 保存可能性の認定ではない。
 - event で Project を直接持つ project / board / artifact は envelope の Project に一致させ、artifact と対応 revision の既知 content も検証する。canvasItem / relation / edge 等の所属は現在の Room 状態なしに判定できない。Room が現在の状態と合わせて domain 適用・参照整合性・参加資格を検査する。
 
-event codec の検証は Event の構造、既知 payload / revision の shape、直接分かる Project と batch identity の範囲に限る。`before` / `after` の同一 entity 対応、cache と current revision の一致、revision 履歴の AI 出自・事前登録遷移を event 単体で認定しない。受信側は現在の状態と照合して **batch 全体を原子的に適用した後**、次状態に `validateKnownM1State` を適用し、失敗した状態を採用しない。batch の途中だけを snapshot と同じ基準で認定してはならない。この受信適用層は本 package にない。サーバーは信頼できる context と `decide` / `validateDomainState` の保存境界を通し、Repository の transaction が成功した後にだけ ack / broadcast する。decode の成功や event ごとの shape 検証を、保存・AI 承認・履歴整合性の証明にしない。
+event codec の検証は Event の構造、既知 payload / revision の shape、直接分かる Project と batch identity の範囲に限る。`before` / `after` の同一 entity 対応、cache と current revision の一致、revision 履歴の AI 出自・事前登録遷移を event 単体で認定しない。受信側は現在の状態と照合して **batch 全体を原子的に適用した後**、次状態に `validateKnownM1State` を適用し、失敗した状態を採用しない。batch の途中だけを snapshot と同じ基準で認定してはならない。受信適用層は [再同期仕様](protocol/resume.md) を参照。サーバーは信頼できる context と `decide` / `validateDomainState` の保存境界を通し、Repository の transaction が成功した後にだけ ack / broadcast する。decode の成功や event ごとの shape 検証を、保存・AI 承認・履歴整合性の証明にしない。
 
-#35 以降は採番と保存の原子性、lastSeq が未来のとき、イベントの保持範囲、古い lastSeq に対する snapshot fallback、サイズ上限を超える snapshot の転送方式を決める。保持日数や再送ページ分割はこの package にない。現在の v1 は一つの joined frame を上限まで受けるだけであり、大きな Room の分割転送を実装済みと扱わない。
+採番と保存の原子性、再送の保持範囲、スナップショットへの切り替えは [再同期仕様](protocol/resume.md) を参照。v1 は一つの joined frame を上限まで受ける。上限を超えるスナップショットの分割転送は今後の課題。
 
 ## JSON 安全性と限界
 

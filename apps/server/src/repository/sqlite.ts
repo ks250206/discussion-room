@@ -26,6 +26,7 @@ import {
   validateProjectState,
   type ProjectState,
   type Repository,
+  type ResumeRead,
   type RepositoryError,
   type StoredAudit,
   type StoredEvent,
@@ -439,20 +440,39 @@ export function openSqliteRepository(path: string): Result<Repository, Repositor
     return ok(audits);
   };
 
+  const readCheckpoint = (projectId: string) => {
+    const state = readState(projectId);
+    if (!state.ok) return state;
+    if (state.value === null) return ok(null);
+    const seq = currentSeq(projectId);
+    return seq.ok ? ok({ state: state.value, seq: seq.value }) : seq;
+  };
+
   return ok({
     readProject(projectId) {
-      const parsed = validate(IdSchema, projectId);
-      if (!parsed.ok) return invalid("Invalid project id");
-      return transaction<{ readonly seq: number; readonly state: ProjectState } | null>(
-        false,
-        () => {
-          const state = readState(parsed.value);
-          if (!state.ok) return state;
-          if (state.value === null) return ok(null);
-          const seq = currentSeq(parsed.value);
-          return seq.ok ? ok({ state: state.value, seq: seq.value }) : seq;
-        },
-      );
+      const id = validate(IdSchema, projectId);
+      if (!id.ok) return invalid("Invalid project id");
+      return transaction(false, () => readCheckpoint(id.value));
+    },
+    readProjectForResume(projectId, afterSeq, maxBatches) {
+      const id = validate(IdSchema, projectId);
+      const cursor = validate(SequenceSchema, afterSeq);
+      if (
+        !id.ok ||
+        (!cursor.ok && afterSeq !== undefined) ||
+        !validate(SequenceSchema, maxBatches).ok
+      )
+        return invalid("Invalid resume cursor or limit");
+      return transaction<ResumeRead | null>(false, () => {
+        const checkpoint = readCheckpoint(id.value);
+        if (!checkpoint.ok) return checkpoint;
+        if (!checkpoint.value) return ok(null);
+        const { seq } = checkpoint.value;
+        if (!cursor.ok || cursor.value > seq || seq - cursor.value > maxBatches)
+          return ok({ ...checkpoint.value, events: null });
+        const events = readLogs(id.value, cursor.value);
+        return events.ok ? ok({ ...checkpoint.value, events: events.value }) : events;
+      });
     },
     listProjects() {
       return transaction(false, () => {
