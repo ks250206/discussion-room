@@ -163,7 +163,20 @@ export function validateProjectState(input: unknown): Result<ProjectState, Repos
   return ok(state);
 }
 
+export type ResumeRead = Readonly<{
+  seq: number;
+  state: ProjectState;
+  /** Null means the cursor did not request or qualify for replay. */
+  events: readonly StoredEvent[] | null;
+}>;
+
 export interface Repository {
+  /** Read the state and bounded replay candidates from the same SQLite snapshot. */
+  readProjectForResume(
+    projectId: unknown,
+    afterSeq: unknown,
+    maxBatches: number,
+  ): Result<ResumeRead | null, RepositoryError>;
   /** Each operation owns a short synchronous transaction. Returned objects are detached. */
   readProject(
     projectId: unknown,

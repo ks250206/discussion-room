@@ -5,6 +5,14 @@ import { DatabaseSync } from "node:sqlite";
 import { Worker } from "node:worker_threads";
 import { afterEach, describe, expect, test } from "vite-plus/test";
 import { validate, IdSchema, TimestampSchema, type Result } from "@discussion-room/domain";
+import {
+  decodeServerMessage,
+  receiveSync,
+  startSync,
+  type JoinMessage,
+  type JoinedMessage,
+} from "@discussion-room/protocol";
+import { encodeJoinReply, RESUME_RETENTION_MS } from "./resume.ts";
 import { openSqliteRepository, type ProjectState, type Repository } from "./index.ts";
 import { DATABASE_VERSION, MIGRATIONS, migrateDatabase } from "./migrations.ts";
 import { isLosslessJson } from "./json.ts";
@@ -309,6 +317,95 @@ describe("SQLite repository", () => {
     expect(success(repository.eventsAfter(id(101), 0)).map((event) => event.seq)).toEqual([1]);
     expect(success(repository.eventsAfter(id(1), 999))).toEqual([]);
     expect(success(repository.eventsAfter(id(999), 0))).toEqual([]);
+  });
+
+  test("reconnects with a snapshot or contiguous batches and recovers a live sequence gap", () => {
+    const { path, repository } = fixture();
+    const other = reopen(path);
+    const projectId = id(1);
+    const initial = state();
+    const updated = changeTitle(initial, "updated");
+    const latest = changeTitle(updated, "latest");
+    success(repository.commit(command(initial)));
+    const reply = (request: JoinMessage | undefined, now = Date.parse(time)): JoinedMessage => {
+      if (!request) throw new Error("Expected join request");
+      const wire = success(encodeJoinReply(repository, request, [], now));
+      if (!wire) throw new Error("Expected join response");
+      const message = success(decodeServerMessage(wire));
+      if (message.type !== "joined") throw new Error("Expected joined");
+      return message;
+    };
+    const first = startSync(projectId);
+    const connected = receiveSync(first.state, reply(first.request));
+    expect(connected.state.checkpoint).toEqual({ seq: 1, snapshot: initial.graph });
+
+    const edit = (before: ProjectState, after: ProjectState, seq: number) => {
+      const input = command(after, seq, 90 + seq);
+      success(
+        other.commit({
+          ...input,
+          event: {
+            ...input.event,
+            payload: {
+              events: [
+                {
+                  type: "project.changed",
+                  actor: input.event.actor,
+                  commandId: input.event.commandId,
+                  timestamp: time,
+                  origin: "human",
+                  before: before.graph.entities.projects[0],
+                  after: after.graph.entities.projects[0],
+                },
+              ],
+            },
+          },
+        }),
+      );
+    };
+    edit(initial, updated, 1);
+    edit(updated, latest, 2);
+
+    const replay = reply({ type: "join", projectId, lastSeq: 1 });
+    if (replay.mode !== "events") throw new Error("Expected event replay");
+    expect(replay.events.map((batch) => batch.seq)).toEqual([2, 3]);
+    const [second, third] = replay.events;
+    if (!second || !third) throw new Error("Expected two event batches");
+    const gap = receiveSync(connected.state, third);
+    expect(gap.request).toEqual({ type: "join", projectId, lastSeq: 1 });
+    expect(gap.state.checkpoint).toBe(connected.state.checkpoint);
+    expect(receiveSync(gap.state, second)).toEqual({ state: gap.state });
+    const mismatchedReplay = receiveSync(gap.state, { ...replay, fromSeq: 2, events: [third] });
+    expect(mismatchedReplay.request).toEqual({ type: "join", projectId });
+    expect(mismatchedReplay.state.checkpoint).toBeNull();
+    expect(receiveSync(mismatchedReplay.state, replay)).toEqual({ state: mismatchedReplay.state });
+
+    const recovered = receiveSync(gap.state, reply(gap.request));
+    expect(recovered.state.checkpoint).toEqual({ seq: 3, snapshot: latest.graph });
+    expect(receiveSync(recovered.state, third)).toEqual({ state: recovered.state });
+
+    expect(reply({ type: "join", projectId, lastSeq: 3 })).toMatchObject({
+      mode: "events",
+      fromSeq: 3,
+      seq: 3,
+      events: [],
+    });
+    // Cursor 0 includes a legacy log without Domain Events; cursor 4 is ahead of the server.
+    for (const cursor of [0, 4]) {
+      expect(reply({ type: "join", projectId, lastSeq: cursor })).toMatchObject({
+        mode: "snapshot",
+        seq: 3,
+        snapshot: latest.graph,
+      });
+    }
+    expect(
+      reply({ type: "join", projectId, lastSeq: 1 }, Date.parse(time) + RESUME_RETENTION_MS + 1),
+    ).toMatchObject({ mode: "snapshot", seq: 3, snapshot: latest.graph });
+    expect(success(repository.readProjectForResume(projectId, 1, 1))).toMatchObject({
+      seq: 3,
+      events: null,
+    });
+    expect(success(repository.readAudit(projectId))).toHaveLength(3);
   });
 
   test("rolls back replacement, event and sequence when final audit insertion fails", () => {

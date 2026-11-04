@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@discussion-room/domain": "workspace:*",
+    "@discussion-room/protocol": "workspace:*",
     "@hono/node-server": "catalog:",
     "hono": "catalog:",
     "valibot": "catalog:",
