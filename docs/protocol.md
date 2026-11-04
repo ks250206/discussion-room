@@ -1,6 +1,6 @@
 # WebSocket protocol v1 — メッセージ境界
 
-Issue #34。設計の正は implementation-plan.md §0 / §1.2 と ADR-009 / ADR-010。本書は概略を実装可能な契約に具体化する。Room 管理、トランザクション、認証、保持期間、実際の再送・競合解決・Presence TTL は実装しない。
+Issue #34。設計の正は implementation-plan.md §0 / §1.2 と ADR-009 / ADR-010。本書は概略を実装可能な契約に具体化する。Room 管理、トランザクション、認証、保持期間、実際の再送・競合解決は実装しない。Presence の間引き、TTL、編集ソフトロックは [presence.md](./presence.md)。
 
 ## 利用 API
 
@@ -43,7 +43,7 @@ const outgoing = encodeClientMessage({
 
 `Member = {clientId, displayName}`。同一 joined の members に clientId の重複を許さない。
 
-`Presence = {boardId, cursor?: {x,y}, selection: Id[], editingItemId?}`。座標は有限値、selection は空でもよい。S→C の clientId はサーバーが接続から付与するため、C→S に付けると拒否する。非永続・間引き・接続断時の除去・TTL・board の実在 / selection 所属は #37 以降。構造が通ることは編集ロックの獲得や接続の認証を意味しない。
+`Presence = {boardId, cursor?: {x,y}, selection: Id[], editingItemId?}`。座標は有限値、selection は空でもよい。S→C の clientId はサーバーが接続から付与するため、C→S に付けると拒否する。構造が通ることは編集ロックの獲得、接続の認証、board の実在、selection の所属を意味しない。非永続の間引き、TTL、board 単位の編集ソフトロックは [presence.md](./presence.md)。接続断時の除去と Room 状態との照合は、そこでの統合責務である。
 
 `command` は domain の `CommandSchema` をそのまま使い、M1 の content を opaque に置き換えない。概略にある envelope の `baseVersion?` は設けず、更新・削除の domain command 内の必須 `baseVersion` に一本化する。`DecisionContext`、actor、origin、aiApproval などの権威入力を command envelope に追加できない。サーバーが信頼できる経路から context を作り、domain の decide と永続化を行う。wire から AI 提案の承認権限を取得しない。`project.create` は生成前で domain command に ID がないため、envelope の projectId と比較できず、この境界では構造を受理する。Room X に参加したことを別 Project 作成の許可として扱ってはならない。サーバーが Room 内での作成を拒否するか、別途定める lobby / Project 作成経路で生成 ID と接続・認可を管理する必要がある。本 package はその経路を実装しない。
 
